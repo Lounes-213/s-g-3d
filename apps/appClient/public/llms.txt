@@ -1,0 +1,12 @@
+# S-G-3D
+
+> Pro 3D Tactical Arena Shooter (1P/3P, Online Rooms & Solo AI Bots).
+
+## Features
+
+- 3 Expansive Multi-Level Tactical Arenas
+- 6 Redesigned Tactical Weapons with Custom Sound Profiles
+- 4 Selectable Operators with Active Combat Skills
+- Dual 1st-Person (1P) & 3rd-Person (3P) Camera Perspectives
+- Online Public Matchmaking, Private Custom Rooms, and Solo vs AI Bots
+- Full Custom Keybinding Remapping

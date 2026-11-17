@@ -1,0 +1,577 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 4.1: Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Hardened Primitives ---
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidCharacter(charId) {
+      return charId in ['striker', 'ghost', 'titan', 'nova', 'spectre', 'valkyrie', 'juggernaut', 'medic'];
+    }
+
+    function isValidSkin(skinId) {
+      return skinId in ['tactical_olive', 'desert_camo', 'urban_ops', 'arctic_ghost', 'crimson_strike', 'specops_gold'];
+    }
+
+    function isValidRankTier(tier) {
+      return tier in ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Apex'];
+    }
+
+    // --- Validation Blueprints (Pillar 2) ---
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+          'uid', 'username', 'characterId', 'skinId',
+          'rankPoints', 'rankTier', 'kills', 'deaths', 'wins', 'matchesPlayed',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'username', 'characterId', 'skinId',
+          'rankPoints', 'rankTier', 'kills', 'deaths', 'wins', 'matchesPlayed',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && data.username is string
+        && data.username.size() >= 2
+        && data.username.size() <= 20
+        && data.username.matches('^[a-zA-Z0-9_\\- ]+$')
+        && data.characterId is string && data.characterId.size() <= 16 && isValidCharacter(data.characterId)
+        && data.skinId is string && data.skinId.size() <= 24 && isValidSkin(data.skinId)
+        && data.rankPoints is int && data.rankPoints >= 0 && data.rankPoints <= 100000
+        && data.rankTier is string && data.rankTier.size() <= 16 && isValidRankTier(data.rankTier)
+        && data.kills is int && data.kills >= 0 && data.kills <= 1000000
+        && data.deaths is int && data.deaths >= 0 && data.deaths <= 1000000
+        && data.wins is int && data.wins >= 0 && data.wins <= 1000000
+        && data.matchesPlayed is int && data.matchesPlayed >= 0 && data.matchesPlayed <= 1000000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPrivateInfo(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFriendEntry(data, userId, friendUid) {
+      return data.keys().hasAll(['ownerUid', 'friendUid', 'friendUsername', 'requestId', 'createdAt'])
+        && data.keys().hasOnly(['ownerUid', 'friendUid', 'friendUsername', 'requestId', 'createdAt'])
+        && isValidId(data.ownerUid)
+        && data.ownerUid == userId
+        && isValidId(data.friendUid)
+        && data.friendUid == friendUid
+        && data.friendUsername is string && data.friendUsername.size() >= 2 && data.friendUsername.size() <= 20
+        && isValidId(data.requestId)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidFriendRequest(data) {
+      return data.keys().hasAll(['fromUid', 'fromUsername', 'toUid', 'toUsername', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['fromUid', 'fromUsername', 'toUid', 'toUsername', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.fromUid)
+        && isValidId(data.toUid)
+        && data.fromUid != data.toUid
+        && data.fromUsername is string && data.fromUsername.size() >= 2 && data.fromUsername.size() <= 20
+        && data.toUsername is string && data.toUsername.size() >= 2 && data.toUsername.size() <= 20
+        && data.status is string && data.status.size() <= 16 && data.status in ['pending', 'accepted', 'declined']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidRoomInvite(data) {
+      return data.keys().hasAll(['fromUid', 'fromUsername', 'toUid', 'roomId', 'roomName', 'mapId', 'mode', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['fromUid', 'fromUsername', 'toUid', 'roomId', 'roomName', 'mapId', 'mode', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.fromUid)
+        && isValidId(data.toUid)
+        && data.fromUid != data.toUid
+        && data.fromUsername is string && data.fromUsername.size() >= 2 && data.fromUsername.size() <= 20
+        && data.roomId is string && data.roomId.size() >= 3 && data.roomId.size() <= 20 && data.roomId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.roomName is string && data.roomName.size() >= 1 && data.roomName.size() <= 40
+        && data.mapId is string && data.mapId.size() >= 2 && data.mapId.size() <= 24
+        && data.mode is string && data.mode.size() >= 2 && data.mode.size() <= 24
+        && data.status is string && data.status.size() <= 16 && data.status in ['active', 'dismissed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWeaponId(weaponId) {
+      return weaponId in ['assaultRifle', 'smg', 'shotgun', 'burstRifle', 'sniper', 'pistol'];
+    }
+
+    function isValidMapId(mapId) {
+      return mapId in ['compound_05', 'veridian_04', 'citadel_01', 'outpost_02', 'nexus_03'];
+    }
+
+    function isValidGameMode(mode) {
+      return mode in ['tdm', 'ffa', 'domination', 'br'];
+    }
+
+    function isValidGameRoom(data) {
+      return data.keys().hasAll([
+          'roomId', 'name', 'hostUid', 'mapId', 'mode', 'isPrivate',
+          'maxPlayers', 'botCount', 'playerCount', 'matchState',
+          'scoreLimit', 'timeRemaining', 'redScore', 'blueScore',
+          'dominationOwner', 'dominationProgress', 'stormRadius', 'stormPhase',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'roomId', 'name', 'hostUid', 'mapId', 'mode', 'isPrivate',
+          'maxPlayers', 'botCount', 'playerCount', 'matchState',
+          'scoreLimit', 'timeRemaining', 'redScore', 'blueScore',
+          'dominationOwner', 'dominationProgress', 'stormRadius', 'stormPhase',
+          'createdAt', 'updatedAt'
+        ])
+        && data.roomId is string && data.roomId.size() >= 3 && data.roomId.size() <= 20 && data.roomId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 40
+        && isValidId(data.hostUid)
+        && data.mapId is string && data.mapId.size() <= 24 && isValidMapId(data.mapId)
+        && data.mode is string && data.mode.size() <= 16 && isValidGameMode(data.mode)
+        && data.isPrivate is bool
+        && data.maxPlayers is int && data.maxPlayers >= 2 && data.maxPlayers <= 16
+        && data.botCount is int && data.botCount >= 0 && data.botCount <= 8
+        && data.playerCount is int && data.playerCount >= 0 && data.playerCount <= 16
+        && data.matchState is string && data.matchState.size() <= 16 && data.matchState in ['waiting', 'playing', 'ended']
+        && data.scoreLimit is int && data.scoreLimit >= 1 && data.scoreLimit <= 200
+        && data.timeRemaining is int && data.timeRemaining >= 0 && data.timeRemaining <= 600
+        && data.redScore is int && data.redScore >= 0 && data.redScore <= 500
+        && data.blueScore is int && data.blueScore >= 0 && data.blueScore <= 500
+        && data.dominationOwner is string && data.dominationOwner.size() <= 8 && data.dominationOwner in ['red', 'blue', 'none']
+        && data.dominationProgress is number && data.dominationProgress >= -100 && data.dominationProgress <= 100
+        && data.stormRadius is number && data.stormRadius >= 0 && data.stormRadius <= 250
+        && data.stormPhase is int && data.stormPhase >= 1 && data.stormPhase <= 5
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidRoomPlayer(data) {
+      return data.keys().hasAll([
+          'playerId', 'ownerUid', 'name', 'color', 'team', 'characterId', 'skinId', 'isBot',
+          'x', 'y', 'z', 'yaw', 'pitch', 'isCrouching', 'isSprinting', 'isMoving', 'isGrounded',
+          'moveForward', 'moveRight', 'isAiming', 'lastDoubleJumpAt',
+          'health', 'maxHealth', 'shield', 'isDead', 'kills', 'deaths',
+          'currentWeapon', 'ammo', 'isReloading', 'dashUntil',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'playerId', 'ownerUid', 'name', 'color', 'team', 'characterId', 'skinId', 'isBot',
+          'x', 'y', 'z', 'yaw', 'pitch', 'isCrouching', 'isSprinting', 'isMoving', 'isGrounded',
+          'moveForward', 'moveRight', 'isAiming', 'lastDoubleJumpAt',
+          'health', 'maxHealth', 'shield', 'isDead', 'kills', 'deaths',
+          'currentWeapon', 'ammo', 'isReloading', 'dashUntil',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.playerId)
+        && isValidId(data.ownerUid)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 24
+        && data.color is string && data.color.size() >= 1 && data.color.size() <= 16
+        && data.team is string && data.team.size() <= 8 && data.team in ['red', 'blue', 'none']
+        && data.characterId is string && data.characterId.size() <= 16 && isValidCharacter(data.characterId)
+        && data.skinId is string && data.skinId.size() <= 24 && isValidSkin(data.skinId)
+        && data.isBot is bool
+        && data.x is number && data.x >= -200 && data.x <= 200
+        && data.y is number && data.y >= -20 && data.y <= 120
+        && data.z is number && data.z >= -200 && data.z <= 200
+        && data.yaw is number && data.yaw >= -20 && data.yaw <= 20
+        && data.pitch is number && data.pitch >= -4 && data.pitch <= 4
+        && data.isCrouching is bool
+        && data.isSprinting is bool
+        && data.isMoving is bool
+        && data.isGrounded is bool
+        && data.moveForward is number && data.moveForward >= -2 && data.moveForward <= 2
+        && data.moveRight is number && data.moveRight >= -2 && data.moveRight <= 2
+        && data.isAiming is bool
+        && data.lastDoubleJumpAt is int && data.lastDoubleJumpAt >= 0
+        && data.health is int && data.health >= 0 && data.health <= 250
+        && data.maxHealth is int && data.maxHealth >= 50 && data.maxHealth <= 250
+        && data.shield is int && data.shield >= 0 && data.shield <= 150
+        && data.isDead is bool
+        && data.kills is int && data.kills >= 0 && data.kills <= 500
+        && data.deaths is int && data.deaths >= 0 && data.deaths <= 500
+        && data.currentWeapon is string && data.currentWeapon.size() <= 16 && isValidWeaponId(data.currentWeapon)
+        && data.ammo is int && data.ammo >= 0 && data.ammo <= 100
+        && data.isReloading is bool
+        && data.dashUntil is int && data.dashUntil >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidRoomEvent(data) {
+      return data.keys().hasAll([
+          'eventId', 'type', 'senderId', 'senderUid', 'targetId',
+          'weaponId', 'weaponName', 'color',
+          'fromX', 'fromY', 'fromZ', 'toX', 'toY', 'toZ', 'hitSurface',
+          'amount', 'isHeadshot', 'distanceMeters', 'killed',
+          'senderTeam', 'targetTeam', 'senderName', 'targetName',
+          'radius', 'speaking',
+          'rtcSdpType', 'rtcSdp', 'rtcCandidate', 'rtcSdpMid', 'rtcSdpMLineIndex',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'eventId', 'type', 'senderId', 'senderUid', 'targetId',
+          'weaponId', 'weaponName', 'color',
+          'fromX', 'fromY', 'fromZ', 'toX', 'toY', 'toZ', 'hitSurface',
+          'amount', 'isHeadshot', 'distanceMeters', 'killed',
+          'senderTeam', 'targetTeam', 'senderName', 'targetName',
+          'radius', 'speaking',
+          'rtcSdpType', 'rtcSdp', 'rtcCandidate', 'rtcSdpMid', 'rtcSdpMLineIndex',
+          'createdAt'
+        ])
+        && isValidId(data.eventId)
+        && data.type is string && data.type.size() <= 24
+        && data.type in ['shot', 'damage', 'kill', 'explosion', 'voice_join', 'voice_leave', 'voice_offer', 'voice_answer', 'voice_ice', 'voice_speaking']
+        && isValidId(data.senderId)
+        && isValidId(data.senderUid)
+        && data.targetId is string && data.targetId.size() <= 128
+        && data.weaponId is string && data.weaponId.size() <= 24
+        && data.weaponName is string && data.weaponName.size() <= 32
+        && data.color is string && data.color.size() <= 16
+        && data.fromX is number && data.fromX >= -250 && data.fromX <= 250
+        && data.fromY is number && data.fromY >= -20 && data.fromY <= 150
+        && data.fromZ is number && data.fromZ >= -250 && data.fromZ <= 250
+        && data.toX is number && data.toX >= -250 && data.toX <= 250
+        && data.toY is number && data.toY >= -20 && data.toY <= 150
+        && data.toZ is number && data.toZ >= -250 && data.toZ <= 250
+        && data.hitSurface is bool
+        && data.amount is int && data.amount >= 0 && data.amount <= 500
+        && data.isHeadshot is bool
+        && data.distanceMeters is int && data.distanceMeters >= 0 && data.distanceMeters <= 500
+        && data.killed is bool
+        && data.senderTeam is string && data.senderTeam.size() <= 8
+        && data.targetTeam is string && data.targetTeam.size() <= 8
+        && data.senderName is string && data.senderName.size() <= 32
+        && data.targetName is string && data.targetName.size() <= 32
+        && data.radius is number && data.radius >= 0 && data.radius <= 30
+        && data.speaking is bool
+        && data.rtcSdpType is string && data.rtcSdpType.size() <= 16
+        && data.rtcSdp is string && data.rtcSdp.size() <= 8192
+        && data.rtcCandidate is string && data.rtcCandidate.size() <= 1024
+        && data.rtcSdpMid is string && data.rtcSdpMid.size() <= 32
+        && data.rtcSdpMLineIndex is int && data.rtcSdpMLineIndex >= -1 && data.rtcSdpMLineIndex <= 32
+        && data.createdAt is timestamp;
+    }
+
+    // --- Collection: /users/{userId} (Public Operator Stats, Zero PII) ---
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn() && resource.data.rankPoints is int && resource.data.rankPoints >= 0;
+
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().rankPoints == 1000
+        && incoming().rankTier == 'Silver'
+        && incoming().kills == 0
+        && incoming().deaths == 0
+        && incoming().wins == 0
+        && incoming().matchesPlayed == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Update profile identity / loadout skin
+          (incoming().diff(existing()).affectedKeys().hasOnly(['username', 'characterId', 'skinId', 'updatedAt'])) ||
+          // Action 2: Record match outcome with bounded rank delta
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['rankPoints', 'rankTier', 'kills', 'deaths', 'wins', 'matchesPlayed', 'updatedAt'])
+            && incoming().matchesPlayed >= existing().matchesPlayed
+            && incoming().matchesPlayed <= existing().matchesPlayed + 1
+            && incoming().kills >= existing().kills
+            && incoming().kills <= existing().kills + 80
+            && incoming().deaths >= existing().deaths
+            && incoming().deaths <= existing().deaths + 80
+            && incoming().wins >= existing().wins
+            && incoming().wins <= existing().wins + 1
+            && incoming().rankPoints <= existing().rankPoints + 120
+            && incoming().rankPoints >= existing().rankPoints - 80
+          )
+        );
+
+      allow delete: if false;
+
+      // --- PII Isolation Subcollection ---
+      match /private/{docId} {
+        allow get: if isOwner(userId) && isValidId(docId) && docId == 'info';
+        allow list: if false;
+        allow create: if isOwner(userId)
+          && isValidId(docId)
+          && docId == 'info'
+          && isValidPrivateInfo(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if isOwner(userId)
+          && isValidId(docId)
+          && docId == 'info'
+          && isValidPrivateInfo(incoming())
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'updatedAt']);
+        allow delete: if false;
+      }
+
+      // --- Friends Subcollection (Pillar 7 Atomicity via getAfter on friendRequest) ---
+      match /friends/{friendUid} {
+        allow get: if isOwner(userId) && isValidId(friendUid);
+        allow list: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+        allow create: if isSignedIn()
+          && isValidId(userId)
+          && isValidId(friendUid)
+          && userId != friendUid
+          && isValidFriendEntry(incoming(), userId, friendUid)
+          && (userId == request.auth.uid || friendUid == request.auth.uid)
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && exists(/databases/$(database)/documents/users/$(friendUid))
+          && getAfter(/databases/$(database)/documents/friendRequests/$(incoming().requestId)).data.status == 'accepted'
+          && (
+            (getAfter(/databases/$(database)/documents/friendRequests/$(incoming().requestId)).data.fromUid == userId
+              && getAfter(/databases/$(database)/documents/friendRequests/$(incoming().requestId)).data.toUid == friendUid) ||
+            (getAfter(/databases/$(database)/documents/friendRequests/$(incoming().requestId)).data.fromUid == friendUid
+              && getAfter(/databases/$(database)/documents/friendRequests/$(incoming().requestId)).data.toUid == userId)
+          );
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(friendUid);
+      }
+    }
+
+    // --- Collection: /friendRequests/{requestId} ---
+    match /friendRequests/{requestId} {
+      allow get: if isSignedIn()
+        && isValidId(requestId)
+        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+
+      allow list: if isSignedIn()
+        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && isValidId(requestId)
+        && isValidFriendRequest(incoming())
+        && incoming().fromUid == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/users/$(incoming().fromUid))
+        && exists(/databases/$(database)/documents/users/$(incoming().toUid));
+
+      allow update: if isSignedIn()
+        && isValidId(requestId)
+        && isValidFriendRequest(incoming())
+        && existing().status == 'pending'
+        && incoming().fromUid == existing().fromUid
+        && incoming().toUid == existing().toUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && request.auth.uid == existing().toUid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && incoming().status in ['accepted', 'declined'];
+
+      allow delete: if isSignedIn()
+        && isValidId(requestId)
+        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+    }
+
+    // --- Collection: /roomInvites/{inviteId} ---
+    match /roomInvites/{inviteId} {
+      allow get: if isSignedIn()
+        && isValidId(inviteId)
+        && (resource.data.toUid == request.auth.uid || resource.data.fromUid == request.auth.uid);
+
+      allow list: if isSignedIn()
+        && (resource.data.toUid == request.auth.uid || resource.data.fromUid == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && isValidId(inviteId)
+        && isValidRoomInvite(incoming())
+        && incoming().fromUid == request.auth.uid
+        && incoming().status == 'active'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/users/$(incoming().toUid));
+
+      allow update: if isSignedIn()
+        && isValidId(inviteId)
+        && isValidRoomInvite(incoming())
+        && existing().status == 'active'
+        && incoming().status == 'dismissed'
+        && incoming().fromUid == existing().fromUid
+        && incoming().toUid == existing().toUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && request.auth.uid == existing().toUid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      allow delete: if isSignedIn()
+        && isValidId(inviteId)
+        && (resource.data.toUid == request.auth.uid || resource.data.fromUid == request.auth.uid);
+    }
+
+    // --- Collection: /rooms/{roomId} (Serverless Online & Private Rooms) ---
+    match /rooms/{roomId} {
+      allow get: if isSignedIn() && isValidId(roomId);
+
+      allow list: if isSignedIn()
+        && resource.data.isPrivate == false;
+
+      allow create: if isSignedIn()
+        && isValidId(roomId)
+        && isValidGameRoom(incoming())
+        && incoming().roomId == roomId
+        && incoming().hostUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isSignedIn()
+        && isValidId(roomId)
+        && isValidGameRoom(incoming())
+        && incoming().roomId == existing().roomId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Current host updates match clock, scores, zone, or storm
+          (
+            existing().hostUid == request.auth.uid
+            && incoming().hostUid == existing().hostUid
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'playerCount', 'matchState', 'timeRemaining',
+              'redScore', 'blueScore', 'dominationOwner', 'dominationProgress',
+              'stormRadius', 'stormPhase', 'updatedAt'
+            ])
+          ) ||
+          // Action 2: Stale host failover (>8s inactivity)
+          (
+            (request.time - existing().updatedAt) > duration.value(8, 's')
+            && incoming().hostUid == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['hostUid', 'updatedAt'])
+          ) ||
+          // Action 3: Member joins/leaves room and updates playerCount
+          (
+            incoming().hostUid == existing().hostUid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['playerCount', 'updatedAt'])
+            && incoming().playerCount <= existing().maxPlayers
+          )
+        );
+
+      allow delete: if isSignedIn()
+        && isValidId(roomId)
+        && (existing().hostUid == request.auth.uid || existing().playerCount <= 1);
+
+      // --- Players & Host-Owned Bots Subcollection ---
+      match /players/{playerId} {
+        allow get: if isSignedIn()
+          && isValidId(roomId)
+          && isValidId(playerId)
+          && exists(/databases/$(database)/documents/rooms/$(roomId));
+
+        allow list: if isSignedIn()
+          && resource.data.ownerUid is string;
+
+        allow create: if isSignedIn()
+          && isValidId(roomId)
+          && isValidId(playerId)
+          && isValidRoomPlayer(incoming())
+          && incoming().playerId == playerId
+          && incoming().ownerUid == request.auth.uid
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/rooms/$(roomId))
+          && (
+            (incoming().isBot == false && playerId == request.auth.uid) ||
+            (incoming().isBot == true && get(/databases/$(database)/documents/rooms/$(roomId)).data.hostUid == request.auth.uid)
+          );
+
+        allow update: if isSignedIn()
+          && isValidId(roomId)
+          && isValidId(playerId)
+          && isValidRoomPlayer(incoming())
+          && incoming().playerId == existing().playerId
+          && incoming().isBot == existing().isBot
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            (existing().isBot == false && existing().ownerUid == request.auth.uid && incoming().ownerUid == existing().ownerUid) ||
+            (existing().isBot == true && get(/databases/$(database)/documents/rooms/$(roomId)).data.hostUid == request.auth.uid && incoming().ownerUid == request.auth.uid)
+          )
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'ownerUid', 'x', 'y', 'z', 'yaw', 'pitch',
+            'isCrouching', 'isSprinting', 'isMoving', 'isGrounded',
+            'moveForward', 'moveRight', 'isAiming', 'lastDoubleJumpAt',
+            'health', 'shield', 'isDead', 'kills', 'deaths',
+            'currentWeapon', 'ammo', 'isReloading', 'dashUntil',
+            'team', 'color', 'updatedAt'
+          ]);
+
+        allow delete: if isSignedIn()
+          && isValidId(roomId)
+          && isValidId(playerId)
+          && (
+            existing().ownerUid == request.auth.uid ||
+            (exists(/databases/$(database)/documents/rooms/$(roomId)) && get(/databases/$(database)/documents/rooms/$(roomId)).data.hostUid == request.auth.uid)
+          );
+      }
+
+      // --- Transient Combat & Voice Events Subcollection ---
+      match /events/{eventId} {
+        allow get: if isSignedIn()
+          && isValidId(roomId)
+          && isValidId(eventId)
+          && exists(/databases/$(database)/documents/rooms/$(roomId));
+
+        allow list: if isSignedIn()
+          && resource.data.senderUid is string;
+
+        allow create: if isSignedIn()
+          && isValidId(roomId)
+          && isValidId(eventId)
+          && isValidRoomEvent(incoming())
+          && incoming().eventId == eventId
+          && incoming().senderUid == request.auth.uid
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/rooms/$(roomId));
+
+        allow update: if false;
+
+        allow delete: if isSignedIn()
+          && isValidId(roomId)
+          && isValidId(eventId)
+          && (
+            existing().senderUid == request.auth.uid ||
+            (exists(/databases/$(database)/documents/rooms/$(roomId)) && get(/databases/$(database)/documents/rooms/$(roomId)).data.hostUid == request.auth.uid)
+          );
+      }
+    }
+  }
+}

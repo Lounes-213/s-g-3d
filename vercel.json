@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm --prefix apps/appClient run build",
+  "outputDirectory": "apps/appClient/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

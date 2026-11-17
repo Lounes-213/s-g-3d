@@ -1,0 +1,26 @@
+{
+  "name": "s-g-3d",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k --names \"SERVER,CLIENT\" -c \"green,blue\" \"PORT=9208 npm run dev -w appServer\" \"npm run dev -w appClient\"",
+    "build": "npm --prefix apps/appServer run build && npm --prefix apps/appClient run build",
+    "lint": "npm --prefix apps/appClient run lint",
+    "start": "PORT=3000 NODE_ENV=production node apps/appServer/dist/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "concurrently": "^9.2.4",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.23.1",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@firebase/eslint-plugin-security-rules": "^0.0.2",
+    "cannon-es": "^0.20.0",
+    "firebase": "^13.4.0"
+  }
+}

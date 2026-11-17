@@ -1,0 +1,613 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public competitive operator profile and persistent rank stats (no PII)",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "username": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20,
+          "pattern": "^[a-zA-Z0-9_\\- ]+$"
+        },
+        "characterId": {
+          "type": "string",
+          "enum": ["striker", "ghost", "titan", "nova", "spectre", "valkyrie", "juggernaut", "medic"],
+          "maxLength": 16
+        },
+        "skinId": {
+          "type": "string",
+          "enum": ["tactical_olive", "desert_camo", "urban_ops", "arctic_ghost", "crimson_strike", "specops_gold"],
+          "maxLength": 24
+        },
+        "rankPoints": {
+          "type": "integer"
+        },
+        "rankTier": {
+          "type": "string",
+          "enum": ["Bronze", "Silver", "Gold", "Platinum", "Diamond", "Apex"],
+          "maxLength": 16
+        },
+        "kills": {
+          "type": "integer"
+        },
+        "deaths": {
+          "type": "integer"
+        },
+        "wins": {
+          "type": "integer"
+        },
+        "matchesPlayed": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "username",
+        "characterId",
+        "skinId",
+        "rankPoints",
+        "rankTier",
+        "kills",
+        "deaths",
+        "wins",
+        "matchesPlayed",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated private PII data owned strictly by the authenticated user",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "createdAt", "updatedAt"]
+    },
+    "FriendRequest": {
+      "title": "FriendRequest",
+      "description": "Pending or resolved friend request between two operators",
+      "type": "object",
+      "properties": {
+        "fromUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fromUsername": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20
+        },
+        "toUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "toUsername": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "accepted", "declined"],
+          "maxLength": 16
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "fromUid",
+        "fromUsername",
+        "toUid",
+        "toUsername",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "FriendEntry": {
+      "title": "FriendEntry",
+      "description": "Confirmed friend record stored under a user's friends subcollection",
+      "type": "object",
+      "properties": {
+        "ownerUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "friendUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "friendUsername": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20
+        },
+        "requestId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerUid", "friendUid", "friendUsername", "requestId", "createdAt"]
+    },
+    "RoomInvite": {
+      "title": "RoomInvite",
+      "description": "Private room invite sent from one friend to another",
+      "type": "object",
+      "properties": {
+        "fromUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fromUsername": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20
+        },
+        "toUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "roomId": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 20,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "roomName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "mapId": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "mode": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "dismissed"],
+          "maxLength": 16
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "fromUid",
+        "fromUsername",
+        "toUid",
+        "roomId",
+        "roomName",
+        "mapId",
+        "mode",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "GameRoom": {
+      "title": "GameRoom",
+      "description": "Serverless multiplayer match room state and host metadata",
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 20,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "hostUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "mapId": {
+          "type": "string",
+          "enum": ["compound_05", "veridian_04", "citadel_01", "outpost_02", "nexus_03"],
+          "maxLength": 24
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["tdm", "ffa", "domination", "br"],
+          "maxLength": 16
+        },
+        "isPrivate": {
+          "type": "boolean"
+        },
+        "maxPlayers": {
+          "type": "integer"
+        },
+        "botCount": {
+          "type": "integer"
+        },
+        "playerCount": {
+          "type": "integer"
+        },
+        "matchState": {
+          "type": "string",
+          "enum": ["waiting", "playing", "ended"],
+          "maxLength": 16
+        },
+        "scoreLimit": {
+          "type": "integer"
+        },
+        "timeRemaining": {
+          "type": "integer"
+        },
+        "redScore": {
+          "type": "integer"
+        },
+        "blueScore": {
+          "type": "integer"
+        },
+        "dominationOwner": {
+          "type": "string",
+          "enum": ["red", "blue", "none"],
+          "maxLength": 8
+        },
+        "dominationProgress": {
+          "type": "number"
+        },
+        "stormRadius": {
+          "type": "number"
+        },
+        "stormPhase": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "roomId",
+        "name",
+        "hostUid",
+        "mapId",
+        "mode",
+        "isPrivate",
+        "maxPlayers",
+        "botCount",
+        "playerCount",
+        "matchState",
+        "scoreLimit",
+        "timeRemaining",
+        "redScore",
+        "blueScore",
+        "dominationOwner",
+        "dominationProgress",
+        "stormRadius",
+        "stormPhase",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "RoomPlayer": {
+      "title": "RoomPlayer",
+      "description": "Synchronized real-time player or host-owned AI bot transform and combat state",
+      "type": "object",
+      "properties": {
+        "playerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "color": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "team": {
+          "type": "string",
+          "enum": ["red", "blue", "none"],
+          "maxLength": 8
+        },
+        "characterId": {
+          "type": "string",
+          "enum": ["striker", "ghost", "titan", "nova", "spectre", "valkyrie", "juggernaut", "medic"],
+          "maxLength": 16
+        },
+        "skinId": {
+          "type": "string",
+          "enum": ["tactical_olive", "desert_camo", "urban_ops", "arctic_ghost", "crimson_strike", "specops_gold"],
+          "maxLength": 24
+        },
+        "isBot": {
+          "type": "boolean"
+        },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" },
+        "yaw": { "type": "number" },
+        "pitch": { "type": "number" },
+        "isCrouching": { "type": "boolean" },
+        "isSprinting": { "type": "boolean" },
+        "isMoving": { "type": "boolean" },
+        "isGrounded": { "type": "boolean" },
+        "moveForward": { "type": "number" },
+        "moveRight": { "type": "number" },
+        "isAiming": { "type": "boolean" },
+        "lastDoubleJumpAt": { "type": "integer" },
+        "health": { "type": "integer" },
+        "maxHealth": { "type": "integer" },
+        "shield": { "type": "integer" },
+        "isDead": { "type": "boolean" },
+        "kills": { "type": "integer" },
+        "deaths": { "type": "integer" },
+        "currentWeapon": {
+          "type": "string",
+          "enum": ["assaultRifle", "smg", "shotgun", "burstRifle", "sniper", "pistol"],
+          "maxLength": 16
+        },
+        "ammo": { "type": "integer" },
+        "isReloading": { "type": "boolean" },
+        "dashUntil": { "type": "integer" },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "playerId",
+        "ownerUid",
+        "name",
+        "color",
+        "team",
+        "characterId",
+        "skinId",
+        "isBot",
+        "x",
+        "y",
+        "z",
+        "yaw",
+        "pitch",
+        "isCrouching",
+        "isSprinting",
+        "isMoving",
+        "isGrounded",
+        "moveForward",
+        "moveRight",
+        "isAiming",
+        "lastDoubleJumpAt",
+        "health",
+        "maxHealth",
+        "shield",
+        "isDead",
+        "kills",
+        "deaths",
+        "currentWeapon",
+        "ammo",
+        "isReloading",
+        "dashUntil",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "RoomEvent": {
+      "title": "RoomEvent",
+      "description": "Transient combat, kill feed, explosion, or WebRTC voice signaling event in a serverless room",
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "shot",
+            "damage",
+            "kill",
+            "explosion",
+            "voice_join",
+            "voice_leave",
+            "voice_offer",
+            "voice_answer",
+            "voice_ice",
+            "voice_speaking"
+          ],
+          "maxLength": 24
+        },
+        "senderId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "senderUid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "targetId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "weaponId": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "weaponName": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "color": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "fromX": { "type": "number" },
+        "fromY": { "type": "number" },
+        "fromZ": { "type": "number" },
+        "toX": { "type": "number" },
+        "toY": { "type": "number" },
+        "toZ": { "type": "number" },
+        "hitSurface": { "type": "boolean" },
+        "amount": { "type": "integer" },
+        "isHeadshot": { "type": "boolean" },
+        "distanceMeters": { "type": "integer" },
+        "killed": { "type": "boolean" },
+        "senderTeam": { "type": "string", "maxLength": 8 },
+        "targetTeam": { "type": "string", "maxLength": 8 },
+        "senderName": { "type": "string", "maxLength": 32 },
+        "targetName": { "type": "string", "maxLength": 32 },
+        "radius": { "type": "number" },
+        "speaking": { "type": "boolean" },
+        "rtcSdpType": { "type": "string", "maxLength": 16 },
+        "rtcSdp": { "type": "string", "maxLength": 8192 },
+        "rtcCandidate": { "type": "string", "maxLength": 1024 },
+        "rtcSdpMid": { "type": "string", "maxLength": 32 },
+        "rtcSdpMLineIndex": { "type": "integer" },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "eventId",
+        "type",
+        "senderId",
+        "senderUid",
+        "targetId",
+        "weaponId",
+        "weaponName",
+        "color",
+        "fromX",
+        "fromY",
+        "fromZ",
+        "toX",
+        "toY",
+        "toZ",
+        "hitSurface",
+        "amount",
+        "isHeadshot",
+        "distanceMeters",
+        "killed",
+        "senderTeam",
+        "targetTeam",
+        "senderName",
+        "targetName",
+        "radius",
+        "speaking",
+        "rtcSdpType",
+        "rtcSdp",
+        "rtcCandidate",
+        "rtcSdpMid",
+        "rtcSdpMLineIndex",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Public competitive operator profile and leaderboard stats"
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Private user PII document (info) isolated to owner only"
+    },
+    "/users/{userId}/friends/{friendUid}": {
+      "schema": { "$ref": "#/entities/FriendEntry" },
+      "description": "Confirmed friend link owned by userId"
+    },
+    "/friendRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/FriendRequest" },
+      "description": "Friend request documents between sender and recipient"
+    },
+    "/roomInvites/{inviteId}": {
+      "schema": { "$ref": "#/entities/RoomInvite" },
+      "description": "Private tactical room invitations between players"
+    },
+    "/rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/GameRoom" },
+      "description": "Active serverless multiplayer and custom rooms"
+    },
+    "/rooms/{roomId}/players/{playerId}": {
+      "schema": { "$ref": "#/entities/RoomPlayer" },
+      "description": "Players and host-simulated AI bots inside a serverless room"
+    },
+    "/rooms/{roomId}/events/{eventId}": {
+      "schema": { "$ref": "#/entities/RoomEvent" },
+      "description": "Combat events, hit confirmations, explosions, and WebRTC voice signals"
+    }
+  }
+}
