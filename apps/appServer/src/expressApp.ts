@@ -24,19 +24,14 @@ expressApp.get("/api/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", app: "S-G-3D" });
 });
 
-// Only serve static client files when running in production.
-if (process.env.NODE_ENV === "production") {
-  const clientDistPath = path.join(__dirname, "../../appClient/dist");
-  expressApp.use(express.static(clientDistPath));
-
-  expressApp.get("*", (_req: Request, res: Response) => {
-    res.status(200).sendFile(path.join(clientDistPath, "index.html"));
+expressApp.get("/", (_req: Request, res: Response) => {
+  res.json({
+    status: "ok",
+    app: "S-G-3D Dedicated Game Server",
+    ws: true,
+    timestamp: Date.now(),
   });
-} else {
-  expressApp.get("/", (_req: Request, res: Response) => {
-    res.redirect("http://localhost:3000");
-  });
-}
+});
 
 expressApp.use(
   (err: Error, _req: Request, res: Response, _next: NextFunction) => {
