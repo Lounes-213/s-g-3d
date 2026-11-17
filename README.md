@@ -1,83 +1,136 @@
-# 🔫 SG 3D
-A low-poly multiplayer arena FPS built with React Three Fiber and a server-authoritative Node.js backend.
+# 🔫 S-G-3D — Multiplayer Tactical Arena FPS (3D)
 
-## 🚀 Project Status
-- **MVP Phase**: Core networking, client-side prediction, and hitscan combat mechanics are fully implemented.
-- **Architecture**: Authoritative server using **socket.io** (TCP) to prevent cheating and ensure smooth, low-latency hit registration.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Play%20Online-0284c7?style=for-the-badge&logo=vercel)](https://s-g-3d.vercel.app)
+[![Server Status](https://img.shields.io/badge/Dedicated%20Server-Online%20(Render)-22c55e?style=for-the-badge&logo=render)](https://s-g-3d-server.onrender.com)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/Lounes-213/s-g-3d)
 
-## 📦 Monorepo Architecture & Structure
+A fast-paced, low-poly 3D tactical arena first-person shooter built with **React 19**, **Three.js / React Three Fiber (R3F)**, **Rapier3D physics engine**, and a high-performance **Node.js + Socket.IO server**.
 
-This project is organized as an **npm workspaces** monorepo, keeping the client, server, and shared libraries unified under a single repository:
+---
+
+## 🎮 Play Now (Live Demo)
+
+- 🌐 **Web Game Client (Vercel):** [https://s-g-3d.vercel.app](https://s-g-3d.vercel.app)
+- 🖥️ **Dedicated WebSocket Server (Render):** [https://s-g-3d-server.onrender.com](https://s-g-3d-server.onrender.com)
+
+> 💡 Open the link in two separate browser windows (or on two devices) to test real-time multiplayer combat, room matchmaking, and synchronized physics!
+
+---
+
+## ✨ Key Features
+
+- **🌐 Server-Authoritative Realtime Multiplayer:** Powered by Socket.IO over WebSockets with client-side prediction, entity interpolation, and authoritative server validation.
+- **⚡ Rapier3D Physics Engine:** Headless WASM-powered 3D physics on the server coupled with `@react-three/rapier` on the client for ultra-consistent collision detection and movement.
+- **⚔️ Game Modes:**
+  - **TDM (Team Deathmatch):** Red vs. Blue tactical team battles.
+  - **FFA (Free-For-All):** Every operator for themselves.
+  - **Domination:** Capture and hold tactical zones.
+  - **Battle Royale (BR):** Shrinking storm zone with survival mechanics.
+- **🎯 Advanced Gunplay:**
+  - Multiple weapons: Assault Rifle, SMG, Shotgun, Burst Rifle, Sniper Rifle, Pistol.
+  - Dynamic recoil, weapon sway, tactical aim-down-sights (ADS), and muzzle flashes.
+  - Hitscan projectile math, hit markers, headshot multipliers, and global killfeed.
+- **🤖 Tactical Bots:** Intelligent bot simulation running autonomously with pathfinding, combat behaviors, and target prioritization.
+- **🎙️ Spatial & Tactical Audio:** Full 3D directional gunshots, footstep sound effects, jump pad impulses, and kill confirmations.
+- **🎨 Customization & Classes:** Selectable operator classes (`striker`, `ghost`, `titan`, `nova`, etc.) with distinctive tactical camouflage uniforms and special abilities (Dash, Tactical Shield, Grenade).
+
+---
+
+## 🕹️ Controls
+
+| Action | Key / Input |
+| :--- | :--- |
+| **Move** | `W` / `A` / `S` / `D` |
+| **Look / Aim** | `Mouse Move` |
+| **Shoot** | `Left Mouse Button` |
+| **Aim Down Sights (ADS)** | `Right Mouse Button` |
+| **Jump / Double Jump** | `Space` |
+| **Sprint** | `Shift` |
+| **Crouch** | `C` or `Ctrl` |
+| **Reload** | `R` |
+| **Switch Weapons** | `1`, `2`, `3`, `4`, `5`, `6` or `Mouse Wheel` |
+| **Tactical Abilities** | `E` (Dash), `Q` (Shield), `F` (Grenade) |
+| **Scoreboard** | `Tab` |
+| **Menu / Pause** | `Esc` |
+
+---
+
+## 📦 Monorepo Architecture
+
+This project is structured as an **npm workspaces** monorepo:
 
 ```text
-project_block_shooter/
+s-g-3d/
 ├── apps/
-│   ├── appClient/          # React 19 + R3F 3D frontend client (Vite)
-│   └── appServer/          # Node.js + Express + Headless Rapier game server
+│   ├── appClient/          # React 19 + R3F 3D Web Frontend (Vite + Tailwind v4)
+│   └── appServer/          # Node.js + Express + Headless Rapier3D Game Server
 ├── packages/
-│   └── shared/             # @block-shooter/shared (Single Source of Truth)
-├── .github/workflows/      # Automated CI/CD Docker build & deploy pipeline
-└── Dockerfile              # Production container build
+│   └── shared/             # @block-shooter/shared (Constants, physics rules, weapon configs)
+├── .github/workflows/      # Automated CI/CD deployment pipelines
+├── firebase.json           # Firebase configuration
+├── vercel.json             # Vercel deployment configuration
+└── package.json            # Root monorepo workspace manifest
 ```
 
-### 🔗 Symbolic Links & Workspace Linking
-- **Automatic Symlinks**: Through npm workspaces, `@block-shooter/shared` is symlinked directly into `node_modules/@block-shooter/shared`.
-- **Zero-Build Hot Reloading**: Changes made to shared constants, weapon balances, or map geometry immediately reflect in both client (via Vite HMR) and server (via tsx/nodemon) without publishing packages or running rebuild steps.
+### ⚖️ `@block-shooter/shared` — Single Source of Truth
+Constants, weapon stats, hitbox parameters, and map boundaries are centralized in `packages/shared`, ensuring zero desynchronization between what the client predicts and what the server computes.
 
-## ⚖️ Shared Package: Single Source of Truth
+---
 
-The `@block-shooter/shared` package serves as the immutable single source of truth across both client and server, preventing state desynchronization:
+## 🛠️ Tech Stack
 
-- **Weapon Balancing (`weapons.ts`)**: Defines stats for all weapons (`assaultRifle`, `pistol`, `burstRifle`) including damage, fire rates, magazine capacities, reload times, ranges, and firing modes (`auto`, `semi`, `burst`). Both client HUD/prediction and server hit verification consume the exact same records.
-- **Physics & Gameplay Constants (`appConstants.ts`)**: Shared values for heavy gravity vector, player capsule radius and height, camera eye-level offset, walk/sprint velocities, jump force, and team deathmatch score limits.
-- **Map & Arena Geometry (`maps.ts`)**: Procedural arena generator (`createBoxArena`) producing mathematical boundary and floor dimensions shared between the server's Rapier physics colliders and client Three.js render meshes.
+### Frontend (`apps/appClient`)
+- **React 19 & React Router v7**
+- **Three.js & React Three Fiber (R3F)** (`@react-three/fiber`, `@react-three/drei`, `@react-three/rapier`)
+- **Zustand** for state management
+- **Tailwind CSS v4** for tactical HUD UI
+- **Socket.io Client** for high-frequency networking
 
-## 🛠️ Technical Stack
+### Backend (`apps/appServer`)
+- **Node.js** with TypeScript (`tsup` bundler)
+- **Express 5**
+- **Socket.IO** (Authoritative WebSocket networking & room orchestration)
+- **@dimforge/rapier3d-compat** (Headless 3D physics WASM engine)
+- **Pino** high-performance logging
 
-### Client
-| Tool | Description |
-| :--- | :--- |
-| **Framework** | React 19, React Router v7 |
-| **3D Engine** | React Three Fiber (R3F), @react-three/drei, @react-three/rapier |
-| **State** | Zustand |
-| **Styling** | Tailwind CSS v4 |
-| **Utilities** | Lucide-React, Tweakpane, use-sound |
+---
 
-### Server
-| Tool | Description |
-| :--- | :--- |
-| **Networking** | Socket.io (TCP) |
-| **Physics** | @dimforge/rapier3d-compat (Headless WASM engine) |
-| **Framework** | Express (Unified static client serving & WebSocket attachment) |
-| **Logging** | Pino, Pino-Pretty |
-| **Runtime** | Node.js with TypeScript (tsx / tsup) |
+## 🚀 Local Development Setup
 
-### Monorepo & DevOps
-| Tool | Description |
-| :--- | :--- |
-| **Workspace** | npm workspaces (monorepo dependency orchestration & symlinks) |
-| **Containerization** | Docker (`node:22-alpine` multi-workspace image) |
-| **CI/CD** | GitHub Actions (Docker build, push to GitHub Packages / GHCR) |
-| **Hosting** | Render (Web Service deployed via automated webhook) |
+### Prerequisites
+- Node.js `>= 20`
+- npm `>= 10`
 
-## ✨ Core Features
-- 🛡️ **Server-Authoritative**: Physics and hit detection are processed on the server to prevent client-side tampering.
-- ⚡ **Client-Side Prediction**: Local movement is processed instantly for a smooth experience, reconciled with server updates.
-- 🎯 **Hitscan Combat**: Precise mathematical raycasting for weapon hits verified against server physics state.
-- 🕒 **Match Structure**: 4-minute rounds with automated respawn logic and team auto-balancing (4v4).
-- 🔫 **Weapon System**: Rifle and pistol with independent magazine tracking, fire rate throttling, and tactical reloading.
-- 🌐 **Unified Production Deployment**: In production, Express hosts both the compiled Vite SPA (`appClient/dist`) and the Socket.io WebSocket server on a single exposed port.
+### Quick Start
+```bash
+# 1. Clone the repository
+git clone https://github.com/Lounes-213/s-g-3d.git
+cd s-g-3d
 
-## 🐳 Docker & Deployment
+# 2. Install dependencies across all workspaces
+npm install
 
-The project is containerized into a single production-ready Docker image:
-- **Layer Caching**: Root manifest files are copied first to cache `npm install` across all workspaces.
-- **Full-Stack Build**: Compiles both the client Vite bundle and the server TypeScript code inside the container.
-- **Single Port**: Express serves both frontend static assets and backend WebSockets on port `9208` (dynamically overridden by cloud environments via `PORT`).
-- **CI/CD Pipeline**: Merges to `main` trigger a GitHub Actions workflow that builds the Docker image, pushes to GitHub Container Registry (`ghcr.io`), and calls the Render deploy hook.
+# 3. Start both Client and Dedicated Server simultaneously
+npm run dev
+```
 
-## 🚀 Getting Started
-1. **Install dependencies**: 
-   `npm install` installs deps for both server and client.
-2. **Run the project**: 
-   `npm run dev` runs both server and client.
+- **Client:** `http://localhost:3000`
+- **Server:** `http://localhost:9208`
+
+---
+
+## 🌐 Production Deployment
+
+- **Frontend (Vercel):**
+  - Build command: `npm --prefix apps/appClient run build`
+  - Output directory: `apps/appClient/dist`
+  - Environment variable: `VITE_SERVER_URL=https://s-g-3d-server.onrender.com`
+- **Server (Render):**
+  - Build command: `npm install && npm run build`
+  - Start command: `npm start`
+  - Environment variable: `NODE_ENV=production`
+
+---
+
+## 📄 License
+This project is licensed under the MIT License - see the [LICENSE.txt](LICENSE.txt) file for details.
