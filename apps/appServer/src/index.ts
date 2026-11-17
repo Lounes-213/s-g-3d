@@ -42,16 +42,16 @@ async function startServer() {
   await RAPIER.init();
   logger.info("Rapier3D WASM physics initialized");
 
-  // Create default public room
+  // Create default public room (Pure PvP between players, no bots)
   createRoom({
     id: "PUBLIC-01",
-    name: "Public Tactical Arena",
+    name: "Public Tactical Arena (Pro PvP)",
     hostId: null,
     isPrivate: false,
     mapId: "veridian_04",
     mode: "tdm",
     maxPlayers: 12,
-    botCount: 4,
+    botCount: 0,
   });
 
   const expressServer = http.createServer(expressApp);
@@ -186,12 +186,15 @@ async function startServer() {
     });
   });
 
-  // 60Hz Physics & Simulation Loop per Room
+  // 60Hz Physics & 30Hz Smooth Network Snapshot Loop per Room
   const tickRate = 60;
   const tickInterval = 1000 / tickRate;
+  let tickCount = 0;
 
   setInterval(() => {
     const now = Date.now();
+    tickCount++;
+    const shouldBroadcast = tickCount % 2 === 0;
 
     rooms.forEach((room) => {
       let humanCount = 0;
@@ -204,7 +207,9 @@ async function startServer() {
       room.lastTickAt = now;
 
       room.world.step();
-      stepRoomBots(room, dt, io);
+      if (room.config.botCount > 0) {
+        stepRoomBots(room, dt, io);
+      }
 
       const map = MAPS[room.config.mapId] || MAPS.citadel_01;
       const maxBoundX = map.floor.width / 2 - 1.5;
@@ -292,7 +297,9 @@ async function startServer() {
         }
       });
 
-      io.to(room.config.id).emit("state", getRoomFullState(room));
+      if (shouldBroadcast) {
+        io.to(room.config.id).emit("state", getRoomFullState(room));
+      }
     });
   }, tickInterval);
 

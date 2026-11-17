@@ -20,8 +20,11 @@ const RemotePlayerItem = ({
   useFrame((_, delta) => {
     targetVec.current.set(pos.x, pos.y, pos.z);
     if (groupRef.current) {
-      groupRef.current.position.lerp(targetVec.current, Math.min(1, delta * 22));
-      groupRef.current.rotation.y = pos.yaw || 0;
+      groupRef.current.position.lerp(targetVec.current, Math.min(1, delta * 24));
+      let diff = (pos.yaw || 0) - groupRef.current.rotation.y;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      groupRef.current.rotation.y += diff * Math.min(1, delta * 20);
     }
   });
 

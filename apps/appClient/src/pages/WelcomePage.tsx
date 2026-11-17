@@ -114,7 +114,9 @@ const WelcomePage = () => {
   );
   const [mapId, setMapId] = useState<MapId>(sessionConfig.mapId);
   const [mode, setMode] = useState<GameMode>(sessionConfig.mode);
-  const [botCount, setBotCount] = useState<number>(sessionConfig.botCount);
+  const [botCount, setBotCount] = useState<number>(
+    sessionConfig.playMode === "solo" ? (sessionConfig.botCount || 4) : 0,
+  );
   const [characterId, setCharacterId] = useState<CharacterId>(
     sessionConfig.characterId,
   );
@@ -259,7 +261,10 @@ const WelcomePage = () => {
       preferredTeam,
       mapId,
       mode,
-      botCount,
+      botCount:
+        effectivePlayMode === "solo"
+          ? (botCount > 0 ? botCount : 4)
+          : (roomAction === "create" ? botCount : 0),
       maxPlayers: 12,
       characterId,
       skinId,
@@ -511,6 +516,7 @@ const WelcomePage = () => {
                   onClick={() => {
                     soundEngine.playClick();
                     setPlayMode("solo");
+                    setBotCount(4);
                   }}
                   className={`p-3.5 border text-left transition-all cursor-pointer ${
                     playMode === "solo"
@@ -533,6 +539,7 @@ const WelcomePage = () => {
                   onClick={() => {
                     soundEngine.playClick();
                     setPlayMode("online");
+                    setBotCount(0);
                   }}
                   className={`p-3.5 border text-left transition-all cursor-pointer ${
                     playMode === "online"
@@ -550,7 +557,7 @@ const WelcomePage = () => {
                     Online Match
                   </div>
                   <div className={`text-[11px] ${mutedText}`}>
-                    Live public multiplayer & voice chat
+                    Pure Pro PvP with real players
                   </div>
                 </button>
 
@@ -558,6 +565,7 @@ const WelcomePage = () => {
                   onClick={() => {
                     soundEngine.playClick();
                     setPlayMode("room");
+                    setBotCount(0);
                   }}
                   className={`p-3.5 border text-left transition-all cursor-pointer ${
                     playMode === "room"
@@ -850,17 +858,19 @@ const WelcomePage = () => {
 
                   <div>
                     <div className={`flex justify-between text-xs font-black uppercase tracking-[0.15em] mb-1.5 ${mutedText}`}>
-                      <span>AI Combat Bots</span>
-                      <span className="text-emerald-600">{botCount} BOTS</span>
+                      <span>Combat Bots</span>
+                      <span className={botCount === 0 ? "text-sky-500 font-black" : "text-emerald-600 font-black"}>
+                        {botCount === 0 ? "0 BOTS (PURE PRO PVP)" : `${botCount} BOTS`}
+                      </span>
                     </div>
                     <input
                       type="range"
-                      min={playMode === "solo" ? 1 : 0}
+                      min={0}
                       max={8}
                       step={1}
                       value={botCount}
                       onChange={(e) => setBotCount(parseInt(e.target.value, 10))}
-                      className="w-full accent-emerald-600 cursor-pointer"
+                      className="w-full accent-sky-500 cursor-pointer"
                     />
                     <div className="flex items-center justify-between mt-1.5 text-[10px] font-black uppercase">
                       <span className={mutedText}>Sprint Style:</span>

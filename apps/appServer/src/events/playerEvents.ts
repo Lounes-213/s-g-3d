@@ -277,13 +277,13 @@ export function joinSpecificRoom(
     if (targetId === "PUBLIC-01") {
       room = createRoom({
         id: "PUBLIC-01",
-        name: "Public Tactical Arena",
+        name: "Public Tactical Arena (Pro PvP)",
         hostId: null,
         isPrivate: false,
         mapId: "veridian_04",
         mode: "tdm",
         maxPlayers: 12,
-        botCount: 4,
+        botCount: 0,
       });
     } else {
       socket.emit("room_error", { message: `Room "${targetId}" not found.` });
@@ -377,7 +377,7 @@ export function handleCreateRoom(
     mapId: payload.mapId,
     mode: payload.mode,
     maxPlayers: Math.min(16, Math.max(2, Number(payload.maxPlayers) || 10)),
-    botCount: Math.min(8, Math.max(0, Number(payload.botCount) ?? 3)),
+    botCount: Math.min(8, Math.max(0, Number(payload.botCount) || 0)),
   });
 
   joinSpecificRoom(socket, io, {
