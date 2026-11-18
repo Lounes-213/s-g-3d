@@ -9,7 +9,9 @@ import {
 } from "@block-shooter/shared";
 import {
   Check,
+  Clock,
   Crown,
+  History,
   LogIn,
   LogOut,
   Search,
@@ -38,6 +40,7 @@ import {
   type OperatorProfile,
 } from "../services/firebaseService";
 import { soundEngine } from "../utils/soundEngine";
+import { clearMatchHistory, getMatchHistory, type MatchHistoryEntry } from "../utils/matchHistory";
 import { OperatorAvatar } from "./OperatorAvatar";
 
 export function AccountModal({ onClose }: { onClose: () => void }) {
@@ -252,19 +255,47 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function LeaderboardModal({ onClose }: { onClose: () => void }) {
+function formatRelativeTime(timestampMs: number | undefined, nowMs: number): string {
+  if (!timestampMs) return "Recorded";
+  const diffSec = Math.max(0, Math.floor((nowMs - timestampMs) / 1000));
+  if (diffSec < 60) return "Just now";
+  const mins = Math.floor(diffSec / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+export function LeaderboardModal({
+  onClose,
+  initialTab = "leaderboard",
+}: {
+  onClose: () => void;
+  initialTab?: "leaderboard" | "players" | "history";
+}) {
   const theme = useSettingsStore((s) => s.theme);
   const myUid = useAuthStore((s) => s.profile?.uid);
   const [rows, setRows] = useState<OperatorProfile[]>([]);
+  const [historyRows, setHistoryRows] = useState<MatchHistoryEntry[]>(() => getMatchHistory());
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"leaderboard" | "players" | "history">(initialTab);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<"rankPoints" | "kills" | "wins" | "kd" | "recent">(
+    initialTab === "players" ? "recent" : "rankPoints",
+  );
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const isLight = theme === "light";
 
   useEffect(() => {
     let active = true;
-    fetchGlobalLeaderboard()
+    fetchGlobalLeaderboard(100)
       .then((list) => {
-        if (active) setRows(list);
+        if (active) {
+          setRows(list);
+          setNowMs(Date.now());
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -275,35 +306,210 @@ export function LeaderboardModal({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
+  const normalizedQuery = searchTerm.trim().toLowerCase();
+  const filteredOperators = rows
+    .filter((r) => !normalizedQuery || r.username.toLowerCase().includes(normalizedQuery))
+    .sort((a, b) => {
+      if (sortBy === "kills") return b.kills - a.kills;
+      if (sortBy === "wins") return b.wins - a.wins;
+      if (sortBy === "kd") {
+        const kdA = a.kills / Math.max(1, a.deaths);
+        const kdB = b.kills / Math.max(1, b.deaths);
+        return kdB - kdA;
+      }
+      if (sortBy === "recent") {
+        return (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0);
+      }
+      return b.rankPoints - a.rankPoints;
+    });
+
   return (
-    <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/60 p-4 font-tactical">
+    <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/65 p-4 font-tactical">
       <div
-        className={`w-full max-w-2xl border p-6 shadow-2xl max-h-[85vh] flex flex-col ${
+        className={`w-full max-w-4xl border p-5 sm:p-6 shadow-2xl max-h-[88vh] flex flex-col ${
           isLight
             ? "bg-white border-slate-200 text-slate-900"
             : "bg-slate-950 border-white/20 text-white"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-current/10 pb-3 mb-4">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-current/10 pb-3 mb-3">
+          <div className="flex items-center gap-2.5">
             <Trophy size={20} className="text-amber-500" />
-            <h2 className="text-lg font-black uppercase tracking-widest">
-              Global Ranked Leaderboard
-            </h2>
+            <div>
+              <h2 className="text-base sm:text-lg font-black uppercase tracking-widest">
+                Operators Directory & Match Results
+              </h2>
+              <p className="text-[10px] uppercase tracking-widest opacity-60">
+                {rows.length} Entered Operators • {historyRows.length} Recent Match Results
+              </p>
+            </div>
           </div>
           <button onClick={onClose} className="p-1 opacity-70 hover:opacity-100 cursor-pointer">
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="py-12 text-center text-xs font-bold uppercase opacity-60">
-              Loading Global Standings...
+        {/* Navigation Tabs */}
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setTab("leaderboard");
+                setSortBy("rankPoints");
+              }}
+              className={`px-3 py-1.5 text-xs font-black uppercase border flex items-center gap-1.5 cursor-pointer ${
+                tab === "leaderboard"
+                  ? "bg-amber-500 border-amber-400 text-slate-950"
+                  : isLight
+                    ? "bg-slate-50 border-slate-200 text-slate-700"
+                    : "bg-slate-900 border-white/15 text-slate-300"
+              }`}
+            >
+              <Trophy size={13} /> Ranked Board
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab("players");
+                setSortBy("recent");
+              }}
+              className={`px-3 py-1.5 text-xs font-black uppercase border flex items-center gap-1.5 cursor-pointer ${
+                tab === "players"
+                  ? "bg-sky-600 border-sky-500 text-white"
+                  : isLight
+                    ? "bg-slate-50 border-slate-200 text-slate-700"
+                    : "bg-slate-900 border-white/15 text-slate-300"
+              }`}
+            >
+              <Users size={13} /> Entered Players ({rows.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setHistoryRows(getMatchHistory());
+                setTab("history");
+              }}
+              className={`px-3 py-1.5 text-xs font-black uppercase border flex items-center gap-1.5 cursor-pointer ${
+                tab === "history"
+                  ? "bg-emerald-600 border-emerald-500 text-white"
+                  : isLight
+                    ? "bg-slate-50 border-slate-200 text-slate-700"
+                    : "bg-slate-900 border-white/15 text-slate-300"
+              }`}
+            >
+              <History size={13} /> Match Results ({historyRows.length})
+            </button>
+          </div>
+
+          {tab !== "history" && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                className={`flex items-center border px-2.5 py-1 ${
+                  isLight ? "bg-slate-50 border-slate-300" : "bg-slate-900 border-white/15"
+                }`}
+              >
+                <Search size={12} className="opacity-60 mr-1.5" />
+                <input
+                  type="text"
+                  placeholder="Filter callsign..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-transparent text-xs font-bold outline-none w-28 sm:w-36"
+                />
+              </div>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className={`px-2.5 py-1.5 border text-[11px] font-black uppercase outline-none cursor-pointer ${
+                  isLight
+                    ? "bg-slate-50 border-slate-300 text-slate-900"
+                    : "bg-slate-900 border-white/15 text-white"
+                }`}
+              >
+                <option value="rankPoints">Sort: Points</option>
+                <option value="recent">Sort: Recent Entry</option>
+                <option value="kills">Sort: Kills</option>
+                <option value="wins">Sort: Wins</option>
+                <option value="kd">Sort: K/D Ratio</option>
+              </select>
             </div>
-          ) : rows.length === 0 ? (
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {tab === "history" ? (
+            historyRows.length === 0 ? (
+              <div className="py-12 text-center text-xs font-bold uppercase opacity-60">
+                No completed matches recorded on this device yet. Finish a match to view results!
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearMatchHistory();
+                      setHistoryRows([]);
+                    }}
+                    className="text-[10px] font-black uppercase text-rose-500 hover:underline cursor-pointer"
+                  >
+                    Clear Local Results
+                  </button>
+                </div>
+                {historyRows.map((m) => {
+                  const kd = (m.kills / Math.max(1, m.deaths)).toFixed(2);
+                  return (
+                    <div
+                      key={m.id}
+                      className={`p-3 border flex flex-wrap items-center justify-between gap-3 text-xs ${
+                        isLight ? "bg-slate-50 border-slate-200" : "bg-slate-900/75 border-white/10"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`px-2.5 py-1 font-black uppercase text-[10px] ${
+                            m.didWin
+                              ? "bg-emerald-600 text-white"
+                              : "bg-rose-600 text-white"
+                          }`}
+                        >
+                          {m.didWin ? "VICTORY" : "DEFEAT"}
+                        </span>
+                        <div>
+                          <div className="font-black uppercase">
+                            {m.mapName} • {m.mode.toUpperCase()} ({m.playMode.toUpperCase()})
+                          </div>
+                          <div className="text-[11px] opacity-70">
+                            {m.roomName} • MVP: <span className="font-bold text-amber-500">{m.mvpName}</span> ({m.mvpKills}K)
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 text-right">
+                        <div>
+                          <div className="font-black text-sky-500">{m.scoreText}</div>
+                          <div className="text-[11px] opacity-75">
+                            {m.kills}K / {m.deaths}D ({kd} K/D)
+                          </div>
+                        </div>
+                        <div className="text-[10px] opacity-60 flex items-center gap-1">
+                          <Clock size={11} />
+                          {formatRelativeTime(m.playedAt, nowMs)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : loading ? (
             <div className="py-12 text-center text-xs font-bold uppercase opacity-60">
-              No ranked operators recorded yet. Play a match to claim #1!
+              Loading Operators Directory...
+            </div>
+          ) : filteredOperators.length === 0 ? (
+            <div className="py-12 text-center text-xs font-bold uppercase opacity-60">
+              No signed-in operators match that query yet. Sign in to appear in the directory!
             </div>
           ) : (
             <table className="w-full text-xs text-left">
@@ -311,34 +517,57 @@ export function LeaderboardModal({ onClose }: { onClose: () => void }) {
                 <tr>
                   <th className="py-2 px-2">#</th>
                   <th className="py-2 px-2">Operator</th>
+                  <th className="py-2 px-2">Class</th>
                   <th className="py-2 px-2">Tier</th>
+                  <th className="py-2 px-2 text-right">Matches</th>
                   <th className="py-2 px-2 text-right">Kills</th>
+                  <th className="py-2 px-2 text-right">K/D</th>
                   <th className="py-2 px-2 text-right">Wins</th>
                   <th className="py-2 px-2 text-right">Points</th>
+                  <th className="py-2 px-2 text-right">Entered</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => (
-                  <tr
-                    key={r.uid}
-                    className={`border-b border-current/5 ${
-                      r.uid === myUid ? "bg-sky-500/15 font-black" : ""
-                    }`}
-                  >
-                    <td className="py-2.5 px-2 font-black">
-                      {i === 0 ? <Crown size={14} className="text-amber-500 inline" /> : i + 1}
-                    </td>
-                    <td className="py-2.5 px-2 font-bold">{r.username}</td>
-                    <td className="py-2.5 px-2 uppercase text-amber-500 font-bold">
-                      {r.rankTier}
-                    </td>
-                    <td className="py-2.5 px-2 text-right">{r.kills}</td>
-                    <td className="py-2.5 px-2 text-right text-emerald-500">{r.wins}</td>
-                    <td className="py-2.5 px-2 text-right font-black text-sky-500">
-                      {r.rankPoints}
-                    </td>
-                  </tr>
-                ))}
+                {filteredOperators.map((r, i) => {
+                  const kd = (r.kills / Math.max(1, r.deaths)).toFixed(2);
+                  const charName = CHARACTERS[r.characterId]?.codename || "STRIKER";
+                  return (
+                    <tr
+                      key={r.uid}
+                      className={`border-b border-current/5 ${
+                        r.uid === myUid ? "bg-sky-500/15 font-black" : ""
+                      }`}
+                    >
+                      <td className="py-2.5 px-2 font-black">
+                        {i === 0 ? <Crown size={14} className="text-amber-500 inline" /> : i + 1}
+                      </td>
+                      <td className="py-2.5 px-2 font-bold">
+                        {r.username}
+                        {r.uid === myUid && (
+                          <span className="ml-1.5 px-1 py-0.2 bg-sky-600 text-white text-[9px] uppercase">
+                            YOU
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-2 uppercase opacity-75 text-[10px] font-bold">
+                        {charName}
+                      </td>
+                      <td className="py-2.5 px-2 uppercase text-amber-500 font-bold">
+                        {r.rankTier}
+                      </td>
+                      <td className="py-2.5 px-2 text-right opacity-80">{r.matchesPlayed}</td>
+                      <td className="py-2.5 px-2 text-right">{r.kills}</td>
+                      <td className="py-2.5 px-2 text-right opacity-85">{kd}</td>
+                      <td className="py-2.5 px-2 text-right text-emerald-500">{r.wins}</td>
+                      <td className="py-2.5 px-2 text-right font-black text-sky-500">
+                        {r.rankPoints}
+                      </td>
+                      <td className="py-2.5 px-2 text-right opacity-65 text-[10px]">
+                        {formatRelativeTime(r.updatedAtMs, nowMs)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

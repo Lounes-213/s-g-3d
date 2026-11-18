@@ -1055,12 +1055,346 @@ function buildCompoundMap(): MapData {
   };
 }
 
+function buildTitanHarborMap(): MapData {
+  const floorW = 170;
+  const floorD = 148;
+  const structures: MapBox[] = [
+    // Central moored cargo freighter hull & flight deck (accessible via twin dock ramps)
+    { name: "ship_hull", x: 0, y: 1.4, z: 0, width: 34, height: 2.8, depth: 18, material: "metal_dark" },
+    { name: "ship_bridge", x: 11, y: 4.4, z: 0, width: 7, height: 3.4, depth: 12, material: "container_blue" },
+    { name: "ship_funnel", x: 11, y: 7.4, z: 0, width: 3.2, height: 2.6, depth: 4, material: "container_red" },
+    ...createStairs("ship_stair_w", -24, 0, 1, 0, 5.5, 7, 2.8, 7, "wood_plank"),
+    ...createStairs("ship_stair_n", 0, -16, 0, 1, 5.5, 7, 2.8, 7, "wood_plank"),
+
+    // Stacked Container Yards (North & South lanes)
+    { name: "cont_n1", x: -34, y: 1.8, z: -36, width: 12, height: 3.6, depth: 4.5, material: "container_red" },
+    { name: "cont_n2", x: -34, y: 5.4, z: -36, width: 12, height: 3.6, depth: 4.5, material: "container_blue" },
+    { name: "cont_n3", x: -12, y: 1.8, z: -40, width: 12, height: 3.6, depth: 4.5, material: "container_blue" },
+    { name: "cont_n4", x: 18, y: 1.8, z: -36, width: 14, height: 3.6, depth: 4.5, material: "crate_orange" },
+    { name: "cont_n5", x: 38, y: 1.8, z: -34, width: 12, height: 3.6, depth: 4.5, material: "container_red" },
+    { name: "cont_s1", x: -36, y: 1.8, z: 36, width: 12, height: 3.6, depth: 4.5, material: "container_blue" },
+    { name: "cont_s2", x: -10, y: 1.8, z: 38, width: 12, height: 3.6, depth: 4.5, material: "container_red" },
+    { name: "cont_s3", x: 20, y: 1.8, z: 36, width: 12, height: 3.6, depth: 4.5, material: "crate_orange" },
+    { name: "cont_s4", x: 36, y: 5.4, z: 34, width: 12, height: 3.6, depth: 4.5, material: "container_blue" },
+    { name: "cont_s4_base", x: 36, y: 1.8, z: 34, width: 12, height: 3.6, depth: 4.5, material: "container_red" },
+
+    // Heavy Shipyard Crane Gantries (West & East Sniper Perches)
+    { name: "crane_w_p1", x: -46, y: 5, z: -14, width: 2.4, height: 10, depth: 2.4, material: "crate_orange" },
+    { name: "crane_w_p2", x: -46, y: 5, z: 14, width: 2.4, height: 10, depth: 2.4, material: "crate_orange" },
+    { name: "crane_w_deck", x: -46, y: 6.2, z: 0, width: 5.5, height: 0.7, depth: 32, material: "metal_dark" },
+    { name: "crane_e_p1", x: 46, y: 5, z: -14, width: 2.4, height: 10, depth: 2.4, material: "crate_orange" },
+    { name: "crane_e_p2", x: 46, y: 5, z: 14, width: 2.4, height: 10, depth: 2.4, material: "crate_orange" },
+    { name: "crane_e_deck", x: 46, y: 6.2, z: 0, width: 5.5, height: 0.7, depth: 32, material: "metal_dark" },
+
+    // Dock Warehouse Sheds & Concrete Bollards
+    ...buildWalkableHouse({
+      id: "harbor_office_nw",
+      x: -54,
+      z: -48,
+      width: 14,
+      depth: 12,
+      wallHeight: 4.6,
+      wallMaterial: "concrete",
+      roofColor: "#334155",
+    }).boxes,
+    ...buildWalkableHouse({
+      id: "harbor_office_se",
+      x: 54,
+      z: 48,
+      width: 14,
+      depth: 12,
+      wallHeight: 4.6,
+      wallMaterial: "concrete",
+      roofColor: "#1e3a5f",
+    }).boxes,
+    { name: "bollard_1", x: -24, y: 1.0, z: -18, width: 2.4, height: 2.0, depth: 2.4, material: "concrete" },
+    { name: "bollard_2", x: -24, y: 1.0, z: 18, width: 2.4, height: 2.0, depth: 2.4, material: "concrete" },
+    { name: "bollard_3", x: 24, y: 1.0, z: -18, width: 2.4, height: 2.0, depth: 2.4, material: "concrete" },
+    { name: "bollard_4", x: 24, y: 1.0, z: 18, width: 2.4, height: 2.0, depth: 2.4, material: "concrete" },
+  ];
+
+  const props: MapProp[] = [
+    { id: "hb_truck_1", kind: "vehicle_truck", x: -60, y: 0, z: -18, rotY: 0.25 },
+    { id: "hb_truck_2", kind: "vehicle_truck", x: 60, y: 0, z: 18, rotY: -2.85 },
+    { id: "hb_jeep_1", kind: "vehicle_jeep", x: -16, y: 0, z: -26, rotY: 1.1 },
+    { id: "hb_jeep_2", kind: "vehicle_jeep", x: 16, y: 0, z: 26, rotY: -1.9 },
+    { id: "hb_gen_1", kind: "ph_generator", x: -32, y: 0, z: -8, rotY: 0 },
+    { id: "hb_gen_2", kind: "ph_generator", x: 32, y: 0, z: 8, rotY: 3.14 },
+    { id: "hb_ammo_1", kind: "ph_crate_ammo", x: -4, y: 2.8, z: 0, rotY: 0.4 },
+    { id: "hb_wood_1", kind: "ph_crate_wood", x: -28, y: 0, z: 22, rotY: 0.3 },
+    { id: "hb_wood_2", kind: "ph_crate_wood", x: 28, y: 0, z: -22, rotY: -0.5 },
+    { id: "hb_util_1", kind: "ph_utility_box", x: -42, y: 0, z: -24, rotY: 0 },
+    { id: "hb_util_2", kind: "ph_utility_box", x: 42, y: 0, z: 24, rotY: 1.57 },
+    { id: "hb_sb_1", kind: "sandbags", x: -50, y: 0, z: 0, rotY: 1.57 },
+    { id: "hb_sb_2", kind: "sandbags", x: 50, y: 0, z: 0, rotY: 1.57 },
+    { id: "hb_lamp_1", kind: "streetlamp", x: -22, y: 0, z: -48, rotY: 0 },
+    { id: "hb_lamp_2", kind: "streetlamp", x: 22, y: 0, z: 48, rotY: 3.14 },
+  ];
+
+  return {
+    id: "titan_harbor",
+    name: "Titan Harbor",
+    subtitle: "Industrial Cargo Dock & Moored Freighter Deck",
+    skybox: "afternoon",
+    isDaylight: true,
+    fogColor: "#cbe6ff",
+    floorMaterial: "concrete",
+    floor: { width: floorW, depth: floorD, thickness: 1, x: 0, y: -0.5, z: 0 },
+    walls: createPerimeterWalls(floorW, floorD, 11, 2, "concrete"),
+    structures,
+    props,
+    jumpPads: [
+      { id: "hb_jp_w", x: -46, y: 0.15, z: -24, radius: 2.0, boostY: 22, color: "#0ea5e9" },
+      { id: "hb_jp_e", x: 46, y: 0.15, z: 24, radius: 2.0, boostY: 22, color: "#0ea5e9" },
+      { id: "hb_jp_ship_s", x: 0, y: 0.15, z: 16, radius: 2.0, boostY: 20, color: "#f97316" },
+    ],
+    captureZone: { x: -2, y: 2.9, z: 0, radius: 9.0 },
+    redSpawns: [
+      { x: -72, y: 1.2, z: -14 },
+      { x: -72, y: 1.2, z: 14 },
+      { x: -64, y: 1.2, z: -38 },
+      { x: -64, y: 1.2, z: 38 },
+    ],
+    blueSpawns: [
+      { x: 72, y: 1.2, z: -14 },
+      { x: 72, y: 1.2, z: 14 },
+      { x: 64, y: 1.2, z: -38 },
+      { x: 64, y: 1.2, z: 38 },
+    ],
+    ffaSpawns: [
+      { x: -68, y: 1.2, z: -28 },
+      { x: 68, y: 1.2, z: 28 },
+      { x: -68, y: 1.2, z: 28 },
+      { x: 68, y: 1.2, z: -28 },
+      { x: 0, y: 1.2, z: -56 },
+      { x: 0, y: 1.2, z: 56 },
+      { x: -4, y: 3.6, z: 0 },
+    ],
+    lootSpawns: [
+      { x: -4, y: 3.2, z: 0 },
+      { x: -46, y: 7.0, z: 0 },
+      { x: 46, y: 7.0, z: 0 },
+      { x: 0, y: 0.4, z: -34 },
+      { x: 0, y: 0.4, z: 34 },
+      { x: -54, y: 0.6, z: -48 },
+      { x: 54, y: 0.6, z: 48 },
+    ],
+  };
+}
+
+function buildAetherSkyportMap(): MapData {
+  const floorW = 152;
+  const floorD = 152;
+  const structures: MapBox[] = [
+    // Elevated Central Sky-Citadel Command Deck
+    { name: "sky_core_deck", x: 0, y: 2.2, z: 0, width: 22, height: 4.4, depth: 22, material: "plaster_wall" },
+    { name: "sky_core_ring", x: 0, y: 4.5, z: 0, width: 10, height: 0.35, depth: 10, material: "cyber_glow", emissive: "#38bdf8" },
+    ...createStairs("sky_st_n", 0, -18, 0, 1, 5, 7, 4.4, 8, "concrete"),
+    ...createStairs("sky_st_s", 0, 18, 0, -1, 5, 7, 4.4, 8, "concrete"),
+
+    // Dual Elevated Wing Decks (West & East) + Skybridges connecting to center
+    { name: "wing_w", x: -42, y: 2.2, z: 0, width: 18, height: 4.4, depth: 34, material: "plaster_wall" },
+    { name: "wing_e", x: 42, y: 2.2, z: 0, width: 18, height: 4.4, depth: 34, material: "plaster_wall" },
+    { name: "bridge_w", x: -22, y: 4.05, z: 0, width: 22, height: 0.7, depth: 5.5, material: "concrete" },
+    { name: "bridge_e", x: 22, y: 4.05, z: 0, width: 22, height: 0.7, depth: 5.5, material: "concrete" },
+    ...createStairs("wing_w_st_n", -42, -24, 0, 1, 5, 7, 4.4, 8, "concrete"),
+    ...createStairs("wing_e_st_s", 42, 24, 0, -1, 5, 7, 4.4, 8, "concrete"),
+
+    // Symmetrical Tactical Pillars & Ballistic Shields
+    { name: "monolith_nw", x: -24, y: 3.0, z: -32, width: 4.5, height: 6.0, depth: 4.5, material: "plaster_wall" },
+    { name: "monolith_ne", x: 24, y: 3.0, z: -32, width: 4.5, height: 6.0, depth: 4.5, material: "plaster_wall" },
+    { name: "monolith_sw", x: -24, y: 3.0, z: 32, width: 4.5, height: 6.0, depth: 4.5, material: "plaster_wall" },
+    { name: "monolith_se", x: 24, y: 3.0, z: 32, width: 4.5, height: 6.0, depth: 4.5, material: "plaster_wall" },
+
+    { name: "cover_n_mid", x: 0, y: 1.1, z: -42, width: 12, height: 2.2, depth: 2.2, material: "concrete" },
+    { name: "cover_s_mid", x: 0, y: 1.1, z: 42, width: 12, height: 2.2, depth: 2.2, material: "concrete" },
+    { name: "cover_nw_bunk", x: -50, y: 1.2, z: -42, width: 10, height: 2.4, depth: 3.0, material: "metal_dark" },
+    { name: "cover_se_bunk", x: 50, y: 1.2, z: 42, width: 10, height: 2.4, depth: 3.0, material: "metal_dark" },
+    { name: "beacon_n", x: 0, y: 4.2, z: -56, width: 2.2, height: 8.4, depth: 2.2, material: "cyber_glow", emissive: "#38bdf8" },
+    { name: "beacon_s", x: 0, y: 4.2, z: 56, width: 2.2, height: 8.4, depth: 2.2, material: "cyber_glow", emissive: "#f43f5e" },
+  ];
+
+  const props: MapProp[] = [
+    { id: "ae_bar_1", kind: "jersey_barrier", x: -15, y: 0, z: -24, rotY: 0 },
+    { id: "ae_bar_2", kind: "jersey_barrier", x: 15, y: 0, z: 24, rotY: 0 },
+    { id: "ae_bar_3", kind: "jersey_barrier", x: -15, y: 0, z: 24, rotY: 0 },
+    { id: "ae_bar_4", kind: "jersey_barrier", x: 15, y: 0, z: -24, rotY: 0 },
+    { id: "ae_gen_1", kind: "ph_generator", x: -34, y: 0, z: -18, rotY: 0.7 },
+    { id: "ae_gen_2", kind: "ph_generator", x: 34, y: 0, z: 18, rotY: -2.4 },
+    { id: "ae_util_1", kind: "ph_utility_box", x: -42, y: 4.4, z: 10, rotY: 0 },
+    { id: "ae_util_2", kind: "ph_utility_box", x: 42, y: 4.4, z: -10, rotY: 3.14 },
+    { id: "ae_crate_1", kind: "ph_crate_ammo", x: -6, y: 4.4, z: -6, rotY: 0.5 },
+    { id: "ae_crate_2", kind: "ph_crate_ammo", x: 6, y: 4.4, z: 6, rotY: -0.5 },
+  ];
+
+  return {
+    id: "aether_skyport",
+    name: "Aether Skyport",
+    subtitle: "High-Altitude Citadel & Dual Skybridges",
+    skybox: "dawn",
+    isDaylight: true,
+    fogColor: "#e0f2fe",
+    floorMaterial: "plaster_wall",
+    floor: { width: floorW, depth: floorD, thickness: 1, x: 0, y: -0.5, z: 0 },
+    walls: createPerimeterWalls(floorW, floorD, 10, 2, "concrete"),
+    structures,
+    props,
+    jumpPads: [
+      { id: "ae_jp_nw", x: -34, y: 0.15, z: -34, radius: 2.0, boostY: 24, color: "#38bdf8" },
+      { id: "ae_jp_ne", x: 34, y: 0.15, z: -34, radius: 2.0, boostY: 24, color: "#38bdf8" },
+      { id: "ae_jp_sw", x: -34, y: 0.15, z: 34, radius: 2.0, boostY: 24, color: "#38bdf8" },
+      { id: "ae_jp_se", x: 34, y: 0.15, z: 34, radius: 2.0, boostY: 24, color: "#38bdf8" },
+    ],
+    captureZone: { x: 0, y: 4.7, z: 0, radius: 8.5 },
+    redSpawns: [
+      { x: -62, y: 1.2, z: -22 },
+      { x: -62, y: 1.2, z: 22 },
+      { x: -62, y: 1.2, z: 0 },
+      { x: -50, y: 1.2, z: -50 },
+    ],
+    blueSpawns: [
+      { x: 62, y: 1.2, z: -22 },
+      { x: 62, y: 1.2, z: 22 },
+      { x: 62, y: 1.2, z: 0 },
+      { x: 50, y: 1.2, z: 50 },
+    ],
+    ffaSpawns: [
+      { x: -58, y: 1.2, z: -42 },
+      { x: 58, y: 1.2, z: 42 },
+      { x: -58, y: 1.2, z: 42 },
+      { x: 58, y: 1.2, z: -42 },
+      { x: 0, y: 1.2, z: -58 },
+      { x: 0, y: 1.2, z: 58 },
+      { x: 0, y: 5.2, z: 0 },
+    ],
+    lootSpawns: [
+      { x: 0, y: 5.0, z: 0 },
+      { x: -42, y: 4.9, z: 0 },
+      { x: 42, y: 4.9, z: 0 },
+      { x: 0, y: 0.4, z: -36 },
+      { x: 0, y: 0.4, z: 36 },
+      { x: -24, y: 0.4, z: -18 },
+      { x: 24, y: 0.4, z: 18 },
+    ],
+  };
+}
+
+function buildCrimsonFoundryMap(): MapData {
+  const floorW = 154;
+  const floorD = 154;
+  const structures: MapBox[] = [
+    // Glowing Molten Crucible Core & Catwalk Platform
+    { name: "crucible_pedestal", x: 0, y: 1.6, z: 0, width: 12, height: 3.2, depth: 12, material: "metal_dark" },
+    { name: "crucible_glow", x: 0, y: 6.0, z: 0, width: 4.2, height: 6.5, depth: 4.2, material: "cyber_glow", emissive: "#f97316" },
+    { name: "catwalk_n", x: 0, y: 2.85, z: -18, width: 6, height: 0.7, depth: 24, material: "metal_dark" },
+    { name: "catwalk_s", x: 0, y: 2.85, z: 18, width: 6, height: 0.7, depth: 24, material: "metal_dark" },
+    ...createStairs("fn_st_n", 0, -37, 0, 1, 5.5, 7, 3.2, 7, "metal_dark"),
+    ...createStairs("fn_st_s", 0, 37, 0, -1, 5.5, 7, 3.2, 7, "metal_dark"),
+
+    // Heavy Smelter Blast Walls & Forges
+    { name: "forge_nw", x: -32, y: 3.2, z: -26, width: 10, height: 6.4, depth: 10, material: "brick_wall" },
+    { name: "forge_ne", x: 32, y: 3.2, z: -26, width: 10, height: 6.4, depth: 10, material: "brick_wall" },
+    { name: "forge_sw", x: -32, y: 3.2, z: 26, width: 10, height: 6.4, depth: 10, material: "brick_wall" },
+    { name: "forge_se", x: 32, y: 3.2, z: 26, width: 10, height: 6.4, depth: 10, material: "brick_wall" },
+    { name: "forge_trim_nw", x: -32, y: 6.6, z: -26, width: 10.6, height: 0.4, depth: 10.6, material: "cyber_glow", emissive: "#ef4444" },
+    { name: "forge_trim_se", x: 32, y: 6.6, z: 26, width: 10.6, height: 0.4, depth: 10.6, material: "cyber_glow", emissive: "#f97316" },
+
+    // Side Industrial Galleries
+    ...buildWalkableHouse({
+      id: "foundry_bay_w",
+      x: -44,
+      z: 0,
+      width: 14,
+      depth: 18,
+      wallHeight: 5.0,
+      wallMaterial: "metal_dark",
+      roofColor: "#291d1d",
+    }).boxes,
+    ...buildWalkableHouse({
+      id: "foundry_bay_e",
+      x: 44,
+      z: 0,
+      width: 14,
+      depth: 18,
+      wallHeight: 5.0,
+      wallMaterial: "metal_dark",
+      roofColor: "#291d1d",
+    }).boxes,
+
+    { name: "slag_wall_w", x: -20, y: 1.2, z: 0, width: 2.2, height: 2.4, depth: 14, material: "concrete" },
+    { name: "slag_wall_e", x: 20, y: 1.2, z: 0, width: 2.2, height: 2.4, depth: 14, material: "concrete" },
+  ];
+
+  const props: MapProp[] = [
+    { id: "cf_truck_1", kind: "vehicle_truck", x: -56, y: 0, z: -36, rotY: 0.6 },
+    { id: "cf_truck_2", kind: "vehicle_truck", x: 56, y: 0, z: 36, rotY: -2.5 },
+    { id: "cf_gen_1", kind: "ph_generator", x: -24, y: 0, z: -12, rotY: 0 },
+    { id: "cf_gen_2", kind: "ph_generator", x: 24, y: 0, z: 12, rotY: 3.14 },
+    { id: "cf_prop_1", kind: "ph_propane", x: -16, y: 0, z: -26, rotY: 0.2 },
+    { id: "cf_prop_2", kind: "ph_propane", x: 16, y: 0, z: 26, rotY: -0.2 },
+    { id: "cf_bar_1", kind: "barrel", x: -12, y: 0, z: 12, rotY: 0 },
+    { id: "cf_bar_2", kind: "barrel", x: 12, y: 0, z: -12, rotY: 0 },
+    { id: "cf_lamp_1", kind: "streetlamp", x: -20, y: 0, z: -42, rotY: 0 },
+    { id: "cf_lamp_2", kind: "streetlamp", x: 20, y: 0, z: 42, rotY: 3.14 },
+  ];
+
+  return {
+    id: "crimson_foundry",
+    name: "Obsidian Foundry",
+    subtitle: "Molten Crucible & Smelter Catwalks",
+    skybox: "evening",
+    isDaylight: false,
+    fogColor: "#261113",
+    floorMaterial: "metal_dark",
+    floor: { width: floorW, depth: floorD, thickness: 1, x: 0, y: -0.5, z: 0 },
+    walls: createPerimeterWalls(floorW, floorD, 11, 2, "metal_dark"),
+    structures,
+    props,
+    jumpPads: [
+      { id: "cf_jp_w", x: -30, y: 0.15, z: 0, radius: 2.0, boostY: 22, color: "#f97316" },
+      { id: "cf_jp_e", x: 30, y: 0.15, z: 0, radius: 2.0, boostY: 22, color: "#f97316" },
+    ],
+    captureZone: { x: 0, y: 3.25, z: 0, radius: 9.0 },
+    redSpawns: [
+      { x: -62, y: 1.2, z: -18 },
+      { x: -62, y: 1.2, z: 18 },
+      { x: -58, y: 1.2, z: -44 },
+      { x: -58, y: 1.2, z: 44 },
+    ],
+    blueSpawns: [
+      { x: 62, y: 1.2, z: -18 },
+      { x: 62, y: 1.2, z: 18 },
+      { x: 58, y: 1.2, z: -44 },
+      { x: 58, y: 1.2, z: 44 },
+    ],
+    ffaSpawns: [
+      { x: -56, y: 1.2, z: -44 },
+      { x: 56, y: 1.2, z: 44 },
+      { x: -56, y: 1.2, z: 44 },
+      { x: 56, y: 1.2, z: -44 },
+      { x: 0, y: 1.2, z: -56 },
+      { x: 0, y: 1.2, z: 56 },
+    ],
+    lootSpawns: [
+      { x: 0, y: 3.6, z: -14 },
+      { x: 0, y: 3.6, z: 14 },
+      { x: -44, y: 0.6, z: 0 },
+      { x: 44, y: 0.6, z: 0 },
+      { x: -24, y: 0.4, z: -38 },
+      { x: 24, y: 0.4, z: 38 },
+    ],
+  };
+}
+
 export const MAP_ORDER = [
   "compound_05",
   "veridian_04",
   "citadel_01",
   "outpost_02",
   "nexus_03",
+  "titan_harbor",
+  "aether_skyport",
+  "crimson_foundry",
 ] as const;
 export type MapId = (typeof MAP_ORDER)[number];
 
@@ -1070,6 +1404,9 @@ export const MAPS: Record<MapId, MapData> = {
   citadel_01: buildCitadelMap(),
   outpost_02: buildOutpostMap(),
   nexus_03: buildNexusMap(),
+  titan_harbor: buildTitanHarborMap(),
+  aether_skyport: buildAetherSkyportMap(),
+  crimson_foundry: buildCrimsonFoundryMap(),
 };
 
 export function resolveCylinderBoxCollisions(

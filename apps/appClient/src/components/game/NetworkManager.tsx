@@ -6,6 +6,7 @@ import { recordMatchStats } from "../../services/firebaseService";
 import { soloEngine } from "../../utils/soloEngine";
 import { arenaPhysics } from "../../utils/cannonPhysics";
 import { createServerlessRoomChannel } from "../../utils/serverlessRoomSync";
+import { recordMatchHistory } from "../../utils/matchHistory";
 import { soundEngine } from "../../utils/soundEngine";
 
 const NetworkManager = () => {
@@ -113,19 +114,42 @@ const NetworkManager = () => {
           newMe
         ) {
           recordedMatchEndRef.current = true;
+          const allList = Object.values(players || {});
+          const topKills = Math.max(...allList.map((p) => p.kills), 0);
+          const mvpPlayer = [...allList].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths)[0];
+          const effectiveMode = (matchInfo.mode || st.mode) as typeof st.mode;
+          const redScore = matchInfo.teamScores?.red ?? st.teamScores.red ?? 0;
+          const blueScore = matchInfo.teamScores?.blue ?? st.teamScores.blue ?? 0;
+          const didWin =
+            effectiveMode === "br"
+              ? !newMe.isDead
+              : effectiveMode === "ffa"
+                ? newMe.kills >= topKills && newMe.kills > 0
+                : newMe.team === "red"
+                  ? redScore >= blueScore
+                  : blueScore >= redScore;
+
+          const scoreText =
+            effectiveMode === "tdm" || effectiveMode === "domination"
+              ? `BLUE ${blueScore} - ${redScore} RED`
+              : `${newMe.kills || 0} KILLS`;
+
+          recordMatchHistory({
+            playMode: sessionConfig.playMode,
+            mode: effectiveMode,
+            mapId: st.mapId,
+            roomName: st.roomName || sessionConfig.roomName || "Online Arena",
+            playerName: newMe.name,
+            kills: newMe.kills || 0,
+            deaths: newMe.deaths || 0,
+            didWin,
+            mvpName: mvpPlayer?.name || newMe.name,
+            mvpKills: mvpPlayer?.kills ?? (newMe.kills || 0),
+            scoreText,
+          });
+
           const authState = useAuthStore.getState();
           if (authState.profile) {
-            const allList = Object.values(players || {});
-            const topKills = Math.max(...allList.map((p) => p.kills), 0);
-            const didWin =
-              matchInfo.mode === "br"
-                ? !newMe.isDead
-                : matchInfo.mode === "ffa"
-                  ? newMe.kills >= topKills && newMe.kills > 0
-                  : newMe.team === "red"
-                    ? (matchInfo.teamScores?.red ?? 0) >= (matchInfo.teamScores?.blue ?? 0)
-                    : (matchInfo.teamScores?.blue ?? 0) >= (matchInfo.teamScores?.red ?? 0);
-
             void recordMatchStats(
               authState.profile.uid,
               newMe.kills || 0,

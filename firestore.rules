@@ -122,11 +122,11 @@ service cloud.firestore {
     }
 
     function isValidWeaponId(weaponId) {
-      return weaponId in ['assaultRifle', 'smg', 'shotgun', 'burstRifle', 'sniper', 'pistol'];
+      return weaponId in ['assaultRifle', 'smg', 'shotgun', 'burstRifle', 'sniper', 'pistol', 'dmr', 'lmg', 'vector', 'revolver'];
     }
 
     function isValidMapId(mapId) {
-      return mapId in ['compound_05', 'veridian_04', 'citadel_01', 'outpost_02', 'nexus_03'];
+      return mapId in ['compound_05', 'veridian_04', 'citadel_01', 'outpost_02', 'nexus_03', 'titan_harbor', 'aether_skyport', 'crimson_foundry'];
     }
 
     function isValidGameMode(mode) {

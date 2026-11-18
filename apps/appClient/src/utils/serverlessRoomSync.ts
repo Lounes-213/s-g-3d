@@ -12,6 +12,7 @@ import {
   WINNING_RULES,
   computeDistanceDamage,
   computeMuzzleWorldPos,
+  createInitialMagazines,
   getSupportHeightAt,
   raycastMapBoxes,
   resolveCylinderBoxCollisions,
@@ -51,6 +52,7 @@ import {
   type RealtimeChannel,
 } from "../stores/useGameStore";
 import { soundEngine } from "./soundEngine";
+import { useSettingsStore } from "../stores/useSettingsStore";
 
 interface RoomDocData {
   roomId: string;
@@ -409,14 +411,7 @@ export function createServerlessRoomChannel(opts: {
         ? preferredTeam
         : "blue";
   const initialSpawn = pickSpawn(roomMeta.mapId, initialTeam);
-  const initialMags: Record<WeaponId, number> = {
-    assaultRifle: WEAPONS.assaultRifle.magSize,
-    smg: WEAPONS.smg.magSize,
-    shotgun: WEAPONS.shotgun.magSize,
-    burstRifle: WEAPONS.burstRifle.magSize,
-    sniper: WEAPONS.sniper.magSize,
-    pistol: WEAPONS.pistol.magSize,
-  };
+  const initialMags: Record<WeaponId, number> = createInitialMagazines();
 
   const localPlayer: RoomPlayerDocData = {
     playerId: uid,
@@ -760,14 +755,7 @@ export function createServerlessRoomChannel(opts: {
         isReloading: false,
         dashUntil: 0,
         vy: 0,
-        magazines: {
-          assaultRifle: WEAPONS.assaultRifle.magSize,
-          smg: WEAPONS.smg.magSize,
-          shotgun: WEAPONS.shotgun.magSize,
-          burstRifle: WEAPONS.burstRifle.magSize,
-          sniper: WEAPONS.sniper.magSize,
-          pistol: WEAPONS.pistol.magSize,
-        },
+        magazines: createInitialMagazines(),
         lastShotTime: 0,
         reloadTimeout: null,
         shieldExpiresAt: 0,
@@ -1983,7 +1971,7 @@ export function createServerlessRoomChannel(opts: {
 
         performActorShoot(localPlayer, dirX, dirY, dirZ, muzzle);
 
-        if (localPlayer.ammo <= 0) {
+        if (localPlayer.ammo <= 0 && useSettingsStore.getState().autoReload) {
           channel.emit("reload");
         } else {
           void flushLocalPlayerToFirestore(true);

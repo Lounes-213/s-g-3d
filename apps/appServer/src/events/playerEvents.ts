@@ -11,6 +11,7 @@ import {
   SKILLS,
   WEAPONS,
   WEAPON_ORDER,
+  createInitialMagazines,
   computeMuzzleWorldPos,
   computeDistanceDamage,
   resolveCylinderBoxCollisions,
@@ -35,17 +36,6 @@ import {
   getRandomSpawn,
 } from "../utils/helpers.js";
 import { logger } from "../utils/logger.js";
-
-function createInitialMagazines(): Record<WeaponId, number> {
-  return {
-    assaultRifle: WEAPONS.assaultRifle.magSize,
-    smg: WEAPONS.smg.magSize,
-    shotgun: WEAPONS.shotgun.magSize,
-    burstRifle: WEAPONS.burstRifle.magSize,
-    sniper: WEAPONS.sniper.magSize,
-    pistol: WEAPONS.pistol.magSize,
-  };
-}
 
 export function isPlayerOnGround(
   world: RAPIER.World,

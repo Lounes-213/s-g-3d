@@ -12,6 +12,7 @@ import {
   WINNING_RULES,
   computeMuzzleWorldPos,
   computeDistanceDamage,
+  createInitialMagazines,
   getSupportHeightAt,
   raycastMapBoxes,
   resolveCylinderBoxCollisions,
@@ -27,8 +28,10 @@ import {
 } from "@block-shooter/shared";
 import { useGameStore, type PlayerState } from "../stores/useGameStore";
 import { useAuthStore } from "../stores/useAuthStore";
+import { useSettingsStore } from "../stores/useSettingsStore";
 import { recordMatchStats } from "../services/firebaseService";
 import { arenaPhysics } from "./cannonPhysics";
+import { recordMatchHistory } from "./matchHistory";
 import { soundEngine } from "./soundEngine";
 
 interface InternalSoloEntity extends PlayerState {
@@ -228,14 +231,7 @@ class SoloGameEngine {
     const skinId: SkinId =
       opts.skinId && CHARACTER_SKINS[opts.skinId] ? opts.skinId : cfg.defaultSkin;
     const spawn = this.getRandomSpawn(opts.team);
-    const mags: Record<WeaponId, number> = {
-      assaultRifle: WEAPONS.assaultRifle.magSize,
-      smg: WEAPONS.smg.magSize,
-      shotgun: WEAPONS.shotgun.magSize,
-      burstRifle: WEAPONS.burstRifle.magSize,
-      sniper: WEAPONS.sniper.magSize,
-      pistol: WEAPONS.pistol.magSize,
-    };
+    const mags: Record<WeaponId, number> = createInitialMagazines();
 
     const color =
       opts.team === "red"
@@ -624,7 +620,9 @@ class SoloGameEngine {
     }
 
     if (shooter.ammo <= 0) {
-      this.reloadLocal(shooterId);
+      if (shooterId !== this.localId || useSettingsStore.getState().autoReload) {
+        this.reloadLocal(shooterId);
+      }
     }
     if (shooterId === this.localId) {
       this.syncToStore();
@@ -1048,25 +1046,46 @@ class SoloGameEngine {
     this.matchState = "ended";
     this.syncToStore();
 
-    // Persist solo match stats for authenticated operator
+    // Persist solo match stats & local match history
     const authState = useAuthStore.getState();
     const me = this.entities.get(this.localId);
-    if (authState.profile && me) {
-      const topKills = Math.max(
-        ...Array.from(this.entities.values()).map((e) => e.kills),
-        0,
-      );
+    if (me) {
+      const allEnts = Array.from(this.entities.values());
+      const topKills = Math.max(...allEnts.map((e) => e.kills), 0);
+      const mvpEntity = [...allEnts].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths)[0];
       const didWin =
         this.mode === "br"
           ? !me.isDead
           : this.mode === "ffa"
             ? me.kills >= topKills && me.kills > 0
             : this.teamScores.blue >= this.teamScores.red;
-      void recordMatchStats(authState.profile.uid, me.kills, me.deaths, didWin).then(
-        (updated) => {
-          if (updated) authState.setProfile(updated);
-        },
-      );
+
+      const scoreText =
+        this.mode === "tdm" || this.mode === "domination"
+          ? `BLUE ${this.teamScores.blue} - ${this.teamScores.red} RED`
+          : `${me.kills} KILLS`;
+
+      recordMatchHistory({
+        playMode: "solo",
+        mode: this.mode,
+        mapId: this.mapId,
+        roomName: "Solo Combat Arena",
+        playerName: me.name,
+        kills: me.kills,
+        deaths: me.deaths,
+        didWin,
+        mvpName: mvpEntity?.name || me.name,
+        mvpKills: mvpEntity?.kills ?? me.kills,
+        scoreText,
+      });
+
+      if (authState.profile) {
+        void recordMatchStats(authState.profile.uid, me.kills, me.deaths, didWin).then(
+          (updated) => {
+            if (updated) authState.setProfile(updated);
+          },
+        );
+      }
     }
 
     window.setTimeout(() => {

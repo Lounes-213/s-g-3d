@@ -25,6 +25,7 @@ export default function WeaponViewModel() {
   const players = useGameStore((state) => state.players);
   const sessionSkin = useGameStore((state) => state.sessionConfig.skinId);
   const perspective = useSettingsStore((state) => state.perspective);
+  const hideWeaponOnAds = useSettingsStore((state) => state.hideWeaponOnAds);
 
   const me = localId ? players[localId] : null;
   const currentWeapon: WeaponId = me?.currentWeapon || "assaultRifle";
@@ -53,15 +54,22 @@ export default function WeaponViewModel() {
     WEAPON_TRANSFORMS[currentWeapon] || WEAPON_TRANSFORMS.assaultRifle;
 
   const getEquipOffset = useEquipAnimation(currentWeapon);
-  const getStrafeRoll = useStrafeSway(combatState.isAiming);
-  const getMouseSway = useMouseSway(combatState.isAiming);
-  const getIdleSway = useIdleSway(combatState.isAiming);
+  const getStrafeRoll = useStrafeSway(false);
+  const getMouseSway = useMouseSway(false);
+  const getIdleSway = useIdleSway(false);
   const getRecoil = useRecoil();
   const sprintPhase = useRef(0);
 
   useFrame((_state, delta) => {
     if (!groupRef.current) return;
     const dt = Math.min(delta, 0.05);
+
+    // Immediately hide 1P viewmodel on scoped weapons or when unobstructed-ADS mode is enabled
+    const shouldHideForAds =
+      combatState.isAiming &&
+      (hideWeaponOnAds || currentWeapon === "sniper" || currentWeapon === "dmr");
+    groupRef.current.visible = !shouldHideForAds;
+    if (shouldHideForAds) return;
 
     const equipOffset = getEquipOffset();
     const strafeRoll = getStrafeRoll();
@@ -79,9 +87,9 @@ export default function WeaponViewModel() {
     const sprintBobX = isSprinting ? Math.cos(sprintPhase.current * 0.5) * 0.026 : 0;
     const sprintBobY = isSprinting ? Math.abs(Math.sin(sprintPhase.current)) * 0.024 : 0;
 
-    // Realistic tactical sprint low-ready diagonal carry across the chest
+    // Realistic tactical sprint low-ready diagonal carry across the chest; lower adsY when shown
     const baseTargetX = combatState.isAiming ? adsX : isSprinting ? 0.08 : posX;
-    const baseTargetY = combatState.isAiming ? adsY : isSprinting ? -0.26 : posY;
+    const baseTargetY = combatState.isAiming ? adsY - 0.02 : isSprinting ? -0.26 : posY;
     const baseTargetZ = combatState.isAiming ? adsZ : isSprinting ? -0.37 : posZ;
 
     const targetRotX = recoil.rotX + (isReloading ? 0.28 : isSprinting ? -0.26 : 0);
@@ -117,8 +125,7 @@ export default function WeaponViewModel() {
     );
   });
 
-  const hideForSniperScope = currentWeapon === "sniper" && combatState.isAiming;
-  if (perspective === "3p" || isDead || hideForSniperScope) {
+  if (perspective === "3p" || isDead) {
     return null;
   }
 

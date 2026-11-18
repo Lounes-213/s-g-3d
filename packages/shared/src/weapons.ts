@@ -4,7 +4,11 @@ export type WeaponId =
   | "shotgun"
   | "burstRifle"
   | "sniper"
-  | "pistol";
+  | "pistol"
+  | "dmr"
+  | "lmg"
+  | "vector"
+  | "revolver";
 
 export type FireMode = "auto" | "semi" | "burst";
 
@@ -24,7 +28,7 @@ export interface WeaponStats {
   mode: FireMode;
   pellets: number;
   spread: number; // radians
-  adsZoom: number; // FOV divisor (1.35 to 2.8)
+  adsZoom: number; // FOV divisor (1.25 to 4.8)
   moveSpeedMult: number;
   recoilKick: number;
   accentColor: string;
@@ -38,6 +42,10 @@ export const WEAPON_ORDER: WeaponId[] = [
   "burstRifle",
   "sniper",
   "pistol",
+  "dmr",
+  "lmg",
+  "vector",
+  "revolver",
 ];
 
 export const WEAPONS: Record<WeaponId, WeaponStats> = {
@@ -79,7 +87,7 @@ export const WEAPONS: Record<WeaponId, WeaponStats> = {
     mode: "auto",
     pellets: 1,
     spread: 0.024,
-    adsZoom: 1.35,
+    adsZoom: 1.38,
     moveSpeedMult: 1.08,
     recoilKick: 0.75,
     accentColor: "#22d3ee",
@@ -101,7 +109,7 @@ export const WEAPONS: Record<WeaponId, WeaponStats> = {
     mode: "semi",
     pellets: 7,
     spread: 0.065,
-    adsZoom: 1.25,
+    adsZoom: 1.28,
     moveSpeedMult: 0.94,
     recoilKick: 2.1,
     accentColor: "#f97316",
@@ -167,11 +175,99 @@ export const WEAPONS: Record<WeaponId, WeaponStats> = {
     mode: "semi",
     pellets: 1,
     spread: 0.008,
-    adsZoom: 1.38,
+    adsZoom: 1.4,
     moveSpeedMult: 1.06,
     recoilKick: 1.3,
     accentColor: "#eab308",
     tracerColor: "#fde047",
+  },
+  dmr: {
+    id: "dmr",
+    slot: 7,
+    name: "MK-14 EBR",
+    shortName: "MK-14",
+    category: "Designated Marksman",
+    description: "Semi-auto 7.62mm designated marksman rifle with 2.8x ACOG chevron optic.",
+    damage: 48,
+    headshotMult: 2.0,
+    fireRate: 340,
+    magSize: 20,
+    reloadTime: 2000,
+    range: 235,
+    mode: "semi",
+    pellets: 1,
+    spread: 0.002,
+    adsZoom: 2.8,
+    moveSpeedMult: 0.91,
+    recoilKick: 1.55,
+    accentColor: "#10b981",
+    tracerColor: "#6ee7b7",
+  },
+  lmg: {
+    id: "lmg",
+    slot: 8,
+    name: "M249 Vulcan",
+    shortName: "M249",
+    category: "Light Machine Gun",
+    description: "85-round heavy suppression squad automatic weapon built for sustained fire.",
+    damage: 22,
+    headshotMult: 1.5,
+    fireRate: 92,
+    magSize: 85,
+    reloadTime: 2850,
+    range: 170,
+    mode: "auto",
+    pellets: 1,
+    spread: 0.018,
+    adsZoom: 1.48,
+    moveSpeedMult: 0.84,
+    recoilKick: 1.15,
+    accentColor: "#f59e0b",
+    tracerColor: "#fcd34d",
+  },
+  vector: {
+    id: "vector",
+    slot: 9,
+    name: "Vector-45 Kriss",
+    shortName: "VECTOR-45",
+    category: "Suppressed PDW",
+    description: "Recoil-mitigated .45 ACP suppressed carbine with blistering 960 RPM output.",
+    damage: 19,
+    headshotMult: 1.6,
+    fireRate: 62,
+    magSize: 33,
+    reloadTime: 1350,
+    range: 105,
+    mode: "auto",
+    pellets: 1,
+    spread: 0.014,
+    adsZoom: 1.44,
+    moveSpeedMult: 1.07,
+    recoilKick: 0.62,
+    accentColor: "#06b6d4",
+    tracerColor: "#a5f3fc",
+  },
+  revolver: {
+    id: "revolver",
+    slot: 0,
+    name: "Magnum-44 Python",
+    shortName: "MAGNUM-44",
+    category: "Heavy Revolver",
+    description: "Precision 6-chamber .44 Magnum wheelgun capable of devastating two-tap precision.",
+    damage: 58,
+    headshotMult: 2.15,
+    fireRate: 440,
+    magSize: 6,
+    reloadTime: 1550,
+    range: 110,
+    mode: "semi",
+    pellets: 1,
+    spread: 0.005,
+    adsZoom: 1.5,
+    moveSpeedMult: 1.04,
+    recoilKick: 1.85,
+    accentColor: "#ec4899",
+    tracerColor: "#f9a8d4",
   },
 };
 
@@ -182,7 +278,26 @@ export const WEAPON_BARREL_LENGTH: Record<WeaponId, number> = {
   burstRifle: 0.88,
   sniper: 1.18,
   pistol: 0.44,
+  dmr: 1.04,
+  lmg: 1.0,
+  vector: 0.72,
+  revolver: 0.48,
 };
+
+export function createInitialMagazines(): Record<WeaponId, number> {
+  return {
+    assaultRifle: WEAPONS.assaultRifle.magSize,
+    smg: WEAPONS.smg.magSize,
+    shotgun: WEAPONS.shotgun.magSize,
+    burstRifle: WEAPONS.burstRifle.magSize,
+    sniper: WEAPONS.sniper.magSize,
+    pistol: WEAPONS.pistol.magSize,
+    dmr: WEAPONS.dmr.magSize,
+    lmg: WEAPONS.lmg.magSize,
+    vector: WEAPONS.vector.magSize,
+    revolver: WEAPONS.revolver.magSize,
+  };
+}
 
 /**
  * Computes the world-space barrel muzzle tip for a character so bullet tracers
@@ -208,7 +323,7 @@ export function computeMuzzleWorldPos(
 
   const eyeOffset = isCrouching ? 0.14 : 0.48;
   const rightOffset = isAiming ? 0.16 : 0.24;
-  const vertOffset = isAiming ? -0.05 : -0.10;
+  const vertOffset = isAiming ? -0.05 : -0.1;
   const barrelLen = WEAPON_BARREL_LENGTH[weaponId] ?? 0.9;
 
   return {
@@ -220,8 +335,8 @@ export function computeMuzzleWorldPos(
 
 /**
  * Ballistic range curve:
- * - Long-range weapons (sniper, burstRifle) deal significantly MORE damage at long distance and less up close.
- * - Close-range weapons (shotgun, smg, pistol) deal MAXIMUM damage up close and fall off steeply with distance.
+ * - Long-range weapons (sniper, dmr, burstRifle) excel at medium/long distance.
+ * - Close-range weapons (shotgun, smg, vector, pistol, revolver) peak at close range.
  */
 export function computeDistanceDamage(
   weaponId: WeaponId,
@@ -240,6 +355,14 @@ export function computeDistanceDamage(
     } else {
       mult = Math.min(1.32, 1.08 + ((d - 36) / 64) * 0.24);
     }
+  } else if (weaponId === "dmr") {
+    if (d <= 10) {
+      mult = 0.84;
+    } else if (d <= 38) {
+      mult = 0.84 + ((d - 10) / 28) * 0.34; // 0.84 -> 1.18
+    } else {
+      mult = Math.max(0.95, 1.18 - ((d - 38) / 110) * 0.23);
+    }
   } else if (weaponId === "burstRifle") {
     if (d <= 8) {
       mult = 0.78;
@@ -256,15 +379,29 @@ export function computeDistanceDamage(
     } else if (d <= 22) {
       mult = 1.22 - ((d - 9) / 13) * 0.72; // 1.22 -> 0.50
     } else {
-      mult = Math.max(0.22, 0.50 - ((d - 22) / 26) * 0.28);
+      mult = Math.max(0.22, 0.5 - ((d - 22) / 26) * 0.28);
     }
-  } else if (weaponId === "smg" || weaponId === "pistol") {
+  } else if (weaponId === "smg" || weaponId === "vector" || weaponId === "pistol") {
     if (d <= 12) {
       mult = 1.15;
     } else if (d <= 36) {
       mult = 1.15 - ((d - 12) / 24) * 0.55; // 1.15 -> 0.60
     } else {
-      mult = Math.max(0.4, 0.60 - ((d - 36) / 45) * 0.2);
+      mult = Math.max(0.4, 0.6 - ((d - 36) / 45) * 0.2);
+    }
+  } else if (weaponId === "revolver") {
+    if (d <= 16) {
+      mult = 1.12;
+    } else if (d <= 48) {
+      mult = 1.12 - ((d - 16) / 32) * 0.44;
+    } else {
+      mult = Math.max(0.55, 0.68 - ((d - 48) / 50) * 0.13);
+    }
+  } else if (weaponId === "lmg") {
+    if (d <= 48) {
+      mult = 1.0;
+    } else {
+      mult = Math.max(0.78, 1.0 - ((d - 48) / 80) * 0.22);
     }
   } else {
     // Assault Rifle balanced mid-range curve
@@ -278,4 +415,5 @@ export function computeDistanceDamage(
   const hsMult = isHeadshot ? stats.headshotMult : 1.0;
   return Math.max(1, Math.round(stats.damage * mult * hsMult));
 }
+
 

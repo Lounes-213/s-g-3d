@@ -11,6 +11,10 @@ import {
 
 export type SoundPack = "tactical" | "scifi" | "classic";
 export type SprintMode = "hold" | "toggle";
+export type AdsMode = "hold" | "toggle";
+export type CameraShoulder = "right" | "left";
+export type CrosshairStyle = "tactical" | "dot" | "cross" | "circle";
+export type GraphicsQuality = "low" | "medium" | "high";
 export type MobileControlsMode = "auto" | "on" | "off";
 
 const STORAGE_KEY = "sg3d_settings_v2";
@@ -26,6 +30,16 @@ interface PersistedSettings {
   theme: ThemeMode;
   skinId: SkinId;
   sprintMode: SprintMode;
+  adsMode: AdsMode;
+  autoSprint: boolean;
+  autoReload: boolean;
+  hideWeaponOnAds: boolean;
+  cameraShoulder: CameraShoulder;
+  cameraDistance: number;
+  crosshairStyle: CrosshairStyle;
+  crosshairColor: string;
+  showDamageNumbers: boolean;
+  graphicsQuality: GraphicsQuality;
   mobileControlsMode: MobileControlsMode;
   voicePttMode: boolean;
 }
@@ -51,6 +65,30 @@ function loadInitialSettings(): PersistedSettings {
         theme: parsed.theme === "dark" ? "dark" : "light",
         skinId: typeof parsed.skinId === "string" ? parsed.skinId : "urban_ops",
         sprintMode: parsed.sprintMode === "toggle" ? "toggle" : "hold",
+        adsMode: parsed.adsMode === "toggle" ? "toggle" : "hold",
+        autoSprint: Boolean(parsed.autoSprint),
+        autoReload: typeof parsed.autoReload === "boolean" ? parsed.autoReload : true,
+        hideWeaponOnAds:
+          typeof parsed.hideWeaponOnAds === "boolean" ? parsed.hideWeaponOnAds : true,
+        cameraShoulder: parsed.cameraShoulder === "left" ? "left" : "right",
+        cameraDistance:
+          typeof parsed.cameraDistance === "number"
+            ? Math.min(5.5, Math.max(2.4, parsed.cameraDistance))
+            : 3.8,
+        crosshairStyle:
+          parsed.crosshairStyle === "dot" ||
+          parsed.crosshairStyle === "cross" ||
+          parsed.crosshairStyle === "circle"
+            ? parsed.crosshairStyle
+            : "tactical",
+        crosshairColor:
+          typeof parsed.crosshairColor === "string" ? parsed.crosshairColor : "#67e8f9",
+        showDamageNumbers:
+          typeof parsed.showDamageNumbers === "boolean" ? parsed.showDamageNumbers : true,
+        graphicsQuality:
+          parsed.graphicsQuality === "low" || parsed.graphicsQuality === "high"
+            ? parsed.graphicsQuality
+            : "medium",
         mobileControlsMode:
           parsed.mobileControlsMode === "on" || parsed.mobileControlsMode === "off"
             ? parsed.mobileControlsMode
@@ -72,6 +110,16 @@ function loadInitialSettings(): PersistedSettings {
     theme: "light",
     skinId: "urban_ops",
     sprintMode: "hold",
+    adsMode: "hold",
+    autoSprint: false,
+    autoReload: true,
+    hideWeaponOnAds: true,
+    cameraShoulder: "right",
+    cameraDistance: 3.8,
+    crosshairStyle: "tactical",
+    crosshairColor: "#67e8f9",
+    showDamageNumbers: true,
+    graphicsQuality: "medium",
     mobileControlsMode: "auto",
     voicePttMode: false,
   };
@@ -100,6 +148,16 @@ export interface SettingsStore extends PersistedSettings {
   toggleTheme: () => void;
   setSkinId: (skinId: SkinId) => void;
   setSprintMode: (mode: SprintMode) => void;
+  setAdsMode: (mode: AdsMode) => void;
+  setAutoSprint: (val: boolean) => void;
+  setAutoReload: (val: boolean) => void;
+  setHideWeaponOnAds: (val: boolean) => void;
+  setCameraShoulder: (shoulder: CameraShoulder) => void;
+  setCameraDistance: (dist: number) => void;
+  setCrosshairStyle: (style: CrosshairStyle) => void;
+  setCrosshairColor: (color: string) => void;
+  setShowDamageNumbers: (val: boolean) => void;
+  setGraphicsQuality: (q: GraphicsQuality) => void;
   setMobileControlsMode: (mode: MobileControlsMode) => void;
   setVoicePttMode: (ptt: boolean) => void;
   setCustomWeaponSound: (weaponId: WeaponId, name: string, dataUrl: string) => void;
@@ -120,6 +178,16 @@ function persistSnapshot(s: SettingsStore): PersistedSettings {
     theme: s.theme,
     skinId: s.skinId,
     sprintMode: s.sprintMode,
+    adsMode: s.adsMode,
+    autoSprint: s.autoSprint,
+    autoReload: s.autoReload,
+    hideWeaponOnAds: s.hideWeaponOnAds,
+    cameraShoulder: s.cameraShoulder,
+    cameraDistance: s.cameraDistance,
+    crosshairStyle: s.crosshairStyle,
+    crosshairColor: s.crosshairColor,
+    showDamageNumbers: s.showDamageNumbers,
+    graphicsQuality: s.graphicsQuality,
     mobileControlsMode: s.mobileControlsMode,
     voicePttMode: s.voicePttMode,
   };
@@ -206,6 +274,66 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     set((state) => {
       saveSettings(persistSnapshot({ ...state, sprintMode }));
       return { sprintMode };
+    }),
+
+  setAdsMode: (adsMode) =>
+    set((state) => {
+      saveSettings(persistSnapshot({ ...state, adsMode }));
+      return { adsMode };
+    }),
+
+  setAutoSprint: (autoSprint) =>
+    set((state) => {
+      saveSettings(persistSnapshot({ ...state, autoSprint }));
+      return { autoSprint };
+    }),
+
+  setAutoReload: (autoReload) =>
+    set((state) => {
+      saveSettings(persistSnapshot({ ...state, autoReload }));
+      return { autoReload };
+    }),
+
+  setHideWeaponOnAds: (hideWeaponOnAds) =>
+    set((state) => {
+      saveSettings(persistSnapshot({ ...state, hideWeaponOnAds }));
+      return { hideWeaponOnAds };
+    }),
+
+  setCameraShoulder: (cameraShoulder) =>
+    set((state) => {
+      saveSettings(persistSnapshot({ ...state, cameraShoulder }));
+      return { cameraShoulder };
+    }),
+
+  setCameraDistance: (cameraDistance) =>
+    set((state) => {
+      saveSettings(persistSnapshot({ ...state, cameraDistance }));
+      return { cameraDistance };
+    }),
+
+  setCrosshairStyle: (crosshairStyle) =>
+    set((state) => {
+      saveSettings(persistSnapshot({ ...state, crosshairStyle }));
+      return { crosshairStyle };
+    }),
+
+  setCrosshairColor: (crosshairColor) =>
+    set((state) => {
+      saveSettings(persistSnapshot({ ...state, crosshairColor }));
+      return { crosshairColor };
+    }),
+
+  setShowDamageNumbers: (showDamageNumbers) =>
+    set((state) => {
+      saveSettings(persistSnapshot({ ...state, showDamageNumbers }));
+      return { showDamageNumbers };
+    }),
+
+  setGraphicsQuality: (graphicsQuality) =>
+    set((state) => {
+      saveSettings(persistSnapshot({ ...state, graphicsQuality }));
+      return { graphicsQuality };
     }),
 
   setMobileControlsMode: (mobileControlsMode) =>

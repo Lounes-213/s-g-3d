@@ -16,6 +16,10 @@ import {
 import { useAppStore } from "../stores/useAppStore";
 import {
   useSettingsStore,
+  type AdsMode,
+  type CameraShoulder,
+  type CrosshairStyle,
+  type GraphicsQuality,
   type MobileControlsMode,
   type SoundPack,
 } from "../stores/useSettingsStore";
@@ -62,6 +66,26 @@ const SideBar = () => {
     toggleTheme,
     sprintMode,
     setSprintMode,
+    adsMode,
+    setAdsMode,
+    autoSprint,
+    setAutoSprint,
+    autoReload,
+    setAutoReload,
+    hideWeaponOnAds,
+    setHideWeaponOnAds,
+    cameraShoulder,
+    setCameraShoulder,
+    cameraDistance,
+    setCameraDistance,
+    crosshairStyle,
+    setCrosshairStyle,
+    crosshairColor,
+    setCrosshairColor,
+    showDamageNumbers,
+    setShowDamageNumbers,
+    graphicsQuality,
+    setGraphicsQuality,
     mobileControlsMode,
     setMobileControlsMode,
     voicePttMode,
@@ -388,6 +412,191 @@ const SideBar = () => {
                     onChange={(e) => setFov(parseInt(e.target.value, 10))}
                     className="w-full accent-sky-600 cursor-pointer"
                   />
+                </div>
+              </div>
+
+              {/* Gameplay Optics, ADS, Auto-Sprint & Camera Shoulder */}
+              <div className={`border p-3.5 space-y-3 ${isLight ? "bg-slate-50 border-slate-200" : "bg-white/5 border-white/10"}`}>
+                <div className="text-xs font-black uppercase tracking-wider">
+                  Pro Combat & Optics Options
+                </div>
+
+                <div>
+                  <div className="text-[11px] font-bold uppercase opacity-75 mb-1">
+                    Aim Down Sights (ADS) Mode
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["hold", "toggle"] as AdsMode[]).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setAdsMode(m)}
+                        className={`py-1.5 text-xs font-black uppercase border cursor-pointer ${
+                          adsMode === m
+                            ? "bg-sky-600 border-sky-500 text-white"
+                            : isLight
+                              ? "bg-white border-slate-300"
+                              : "bg-slate-900 border-white/10 text-slate-400"
+                        }`}
+                      >
+                        {m === "hold" ? "Hold Right-Click" : "Toggle Tap"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[11px] font-bold uppercase opacity-75 mb-1">
+                    3rd Person Shoulder Side
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["right", "left"] as CameraShoulder[]).map((side) => (
+                      <button
+                        key={side}
+                        onClick={() => setCameraShoulder(side)}
+                        className={`py-1.5 text-xs font-black uppercase border cursor-pointer ${
+                          cameraShoulder === side
+                            ? "bg-sky-600 border-sky-500 text-white"
+                            : isLight
+                              ? "bg-white border-slate-300"
+                              : "bg-slate-900 border-white/10 text-slate-400"
+                        }`}
+                      >
+                        {side} Shoulder
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-black uppercase mb-1">
+                    <span>3P Camera Distance</span>
+                    <span className="text-sky-600">{cameraDistance.toFixed(1)}m</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="2.4"
+                    max="5.5"
+                    step="0.1"
+                    value={cameraDistance}
+                    onChange={(e) => setCameraDistance(parseFloat(e.target.value))}
+                    className="w-full accent-sky-600 cursor-pointer"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setHideWeaponOnAds(!hideWeaponOnAds)}
+                    className={`p-2 border text-[11px] font-black uppercase flex items-center justify-between cursor-pointer ${
+                      isLight ? "bg-white border-slate-300" : "bg-slate-900 border-white/15"
+                    }`}
+                  >
+                    <span>Clear ADS Sight</span>
+                    <span className={hideWeaponOnAds ? "text-emerald-600" : "text-slate-400"}>
+                      {hideWeaponOnAds ? "ON" : "OFF"}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setAutoSprint(!autoSprint)}
+                    className={`p-2 border text-[11px] font-black uppercase flex items-center justify-between cursor-pointer ${
+                      isLight ? "bg-white border-slate-300" : "bg-slate-900 border-white/15"
+                    }`}
+                  >
+                    <span>Auto-Sprint</span>
+                    <span className={autoSprint ? "text-emerald-600" : "text-slate-400"}>
+                      {autoSprint ? "ON" : "OFF"}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setAutoReload(!autoReload)}
+                    className={`p-2 border text-[11px] font-black uppercase flex items-center justify-between cursor-pointer ${
+                      isLight ? "bg-white border-slate-300" : "bg-slate-900 border-white/15"
+                    }`}
+                  >
+                    <span>Auto-Reload</span>
+                    <span className={autoReload ? "text-emerald-600" : "text-slate-400"}>
+                      {autoReload ? "ON" : "OFF"}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setShowDamageNumbers(!showDamageNumbers)}
+                    className={`p-2 border text-[11px] font-black uppercase flex items-center justify-between cursor-pointer ${
+                      isLight ? "bg-white border-slate-300" : "bg-slate-900 border-white/15"
+                    }`}
+                  >
+                    <span>Damage Popups</span>
+                    <span className={showDamageNumbers ? "text-emerald-600" : "text-slate-400"}>
+                      {showDamageNumbers ? "ON" : "OFF"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Crosshair Style, Color & Graphics Quality */}
+              <div className={`border p-3.5 space-y-3 ${isLight ? "bg-slate-50 border-slate-200" : "bg-white/5 border-white/10"}`}>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-wider mb-1.5">
+                    Reticle Style & Color
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5 mb-2">
+                    {(["tactical", "cross", "dot", "circle"] as CrosshairStyle[]).map((st) => (
+                      <button
+                        key={st}
+                        onClick={() => setCrosshairStyle(st)}
+                        className={`py-1.5 text-[10px] font-black uppercase border cursor-pointer ${
+                          crosshairStyle === st
+                            ? "bg-sky-600 border-sky-500 text-white"
+                            : isLight
+                              ? "bg-white border-slate-300"
+                              : "bg-slate-900 border-white/10 text-slate-400"
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {["#67e8f9", "#22c55e", "#facc15", "#f43f5e", "#ffffff"].map((hex) => (
+                      <button
+                        key={hex}
+                        type="button"
+                        onClick={() => setCrosshairColor(hex)}
+                        className={`w-7 h-7 rounded-full border-2 cursor-pointer transition-transform ${
+                          crosshairColor === hex ? "scale-110 border-sky-500" : "border-slate-400/50"
+                        }`}
+                        style={{ backgroundColor: hex }}
+                        aria-label={`Select reticle color ${hex}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-black uppercase tracking-wider mb-1.5">
+                    Graphics & Performance Quality
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(
+                      [
+                        { id: "low", label: "Low (Max FPS)" },
+                        { id: "medium", label: "Balanced" },
+                        { id: "high", label: "High" },
+                      ] as Array<{ id: GraphicsQuality; label: string }>
+                    ).map((g) => (
+                      <button
+                        key={g.id}
+                        onClick={() => setGraphicsQuality(g.id)}
+                        className={`py-1.5 text-[10px] font-black uppercase border cursor-pointer ${
+                          graphicsQuality === g.id
+                            ? "bg-amber-500 border-amber-400 text-slate-950"
+                            : isLight
+                              ? "bg-white border-slate-300"
+                              : "bg-slate-900 border-white/10 text-slate-400"
+                        }`}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 

@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { combatState } from "@block-shooter/shared";
+import { useGameStore } from "../../stores/useGameStore";
 
 const vignetteShader = {
   uniforms: {
@@ -20,7 +21,7 @@ const vignetteShader = {
     void main() {
       vec2 center = vUv - 0.5;
       float dist = length(center);
-      float vignette = smoothstep(0.3, 0.7, dist);
+      float vignette = smoothstep(0.42, 0.85, dist);
 
       gl_FragColor = vec4(0.0, 0.0, 0.0, vignette * darkness);
     }
@@ -33,13 +34,16 @@ export default function AdsVignette() {
   useFrame(() => {
     if (!materialRef.current) return;
 
-    const targetDarkness = combatState.isAiming ? 0.8 : 0.0;
+    const st = useGameStore.getState();
+    const wpn = st.localId ? st.players[st.localId]?.currentWeapon : undefined;
+    const isScoped = wpn === "sniper" || wpn === "dmr";
+    const targetDarkness = combatState.isAiming ? (isScoped ? 0.42 : 0.15) : 0.0;
 
     // lerp the GLSL uniform
     materialRef.current.uniforms.darkness.value = THREE.MathUtils.lerp(
       materialRef.current.uniforms.darkness.value,
       targetDarkness,
-      0.15,
+      0.18,
     );
   });
 

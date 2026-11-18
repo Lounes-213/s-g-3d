@@ -221,8 +221,13 @@ const LocalPlayer = () => {
       if (code === kb.weapon4) emitWeaponSwitch(WEAPON_ORDER[3]);
       if (code === kb.weapon5) emitWeaponSwitch(WEAPON_ORDER[4]);
       if (code === kb.weapon6) emitWeaponSwitch(WEAPON_ORDER[5]);
+      if (code === kb.weapon7) emitWeaponSwitch(WEAPON_ORDER[6]);
+      if (code === kb.weapon8) emitWeaponSwitch(WEAPON_ORDER[7]);
+      if (code === kb.weapon9) emitWeaponSwitch(WEAPON_ORDER[8]);
+      if (code === kb.weapon10) emitWeaponSwitch(WEAPON_ORDER[9]);
 
       if (code === kb.reload && !e.repeat) {
+        combatState.isAiming = false;
         if (playMode === "solo") {
           soloEngine.reloadLocal();
         } else if (channel) {
@@ -266,7 +271,10 @@ const LocalPlayer = () => {
     const handleMouseDown = (e: MouseEvent) => {
       if (!useGameStore.getState().isLocked) return;
       if (e.button === 0) combatState.isShooting = true;
-      if (e.button === 2) combatState.isAiming = true;
+      if (e.button === 2) {
+        const mode = useSettingsStore.getState().adsMode;
+        combatState.isAiming = mode === "toggle" ? !combatState.isAiming : true;
+      }
     };
 
     const handleMouseUp = (e: MouseEvent) => {
@@ -275,7 +283,10 @@ const LocalPlayer = () => {
         triggerReady.current = true;
       }
       if (e.button === 2) {
-        combatState.isAiming = false;
+        const mode = useSettingsStore.getState().adsMode;
+        if (mode === "hold") {
+          combatState.isAiming = false;
+        }
       }
     };
 
@@ -373,6 +384,8 @@ const LocalPlayer = () => {
       camera.updateProjectionMatrix();
     }
 
+    const liveSettings = useSettingsStore.getState();
+
     // Combine keyboard + touch joystick movement
     const keyForward =
       (movementState.forward ? 1 : 0) - (movementState.backward ? 1 : 0);
@@ -380,10 +393,15 @@ const LocalPlayer = () => {
     const forward = THREE.MathUtils.clamp(keyForward + touchInputState.moveY, -1, 1);
     const right = THREE.MathUtils.clamp(keyRight - touchInputState.moveX, -1, 1);
     const isMoving = Math.hypot(forward, right) > 0.05;
+    const autoSprintEngaged = liveSettings.autoSprint && forward > 0.45;
     const effectiveSprint =
-      (movementState.sprint || touchInputState.sprintActive) &&
+      (movementState.sprint || touchInputState.sprintActive || autoSprintEngaged) &&
       !movementState.crouch &&
       !combatState.isAiming;
+
+    if (curMe?.isDead || curMe?.isReloading) {
+      combatState.isAiming = false;
+    }
 
     // Desired horizontal velocity fed into Cannon-es rigid body
     let targetVx = 0;
@@ -530,18 +548,26 @@ const LocalPlayer = () => {
     } else {
       const eyeOrigin = eyeOriginRef.current.set(
         playerPos.current.x,
-        playerPos.current.y + (combatState.isAiming ? 0.08 : 0.18),
+        playerPos.current.y + (combatState.isAiming ? 0.14 : 0.2),
         playerPos.current.z,
       );
 
-      const shoulderRight = combatState.isAiming ? 0.5 : 0.62;
-      const desiredBack = combatState.isAiming ? 1.85 : 3.05;
+      const shoulderSign = liveSettings.cameraShoulder === "left" ? -1 : 1;
+      const shoulderRight =
+        (combatState.isAiming ? 0.64 : 0.62) * shoulderSign;
+      const baseDist = THREE.MathUtils.clamp(liveSettings.cameraDistance || 3.8, 2.4, 5.5);
+      const isScopedSniper = combatState.isAiming && activeWeaponId === "sniper";
+      const desiredBack = isScopedSniper
+        ? 0.25
+        : combatState.isAiming
+          ? Math.max(1.45, baseDist * 0.46)
+          : baseDist;
 
       const desiredCamPos = desiredCamPosRef.current
         .copy(eyeOrigin)
-        .addScaledVector(camRight, shoulderRight)
+        .addScaledVector(camRight, isScopedSniper ? 0 : shoulderRight)
         .addScaledVector(camDir.current, -desiredBack);
-      desiredCamPos.y += combatState.isAiming ? 0.06 : 0.14;
+      desiredCamPos.y += combatState.isAiming ? 0.08 : 0.14;
 
       const toCam = toCamRef.current.subVectors(desiredCamPos, eyeOrigin);
       const maxLen = Math.max(0.01, toCam.length());
@@ -558,11 +584,11 @@ const LocalPlayer = () => {
         map,
       );
 
-      const targetSafe = Math.max(0.45, wallDist - 0.25);
+      const targetSafe = isScopedSniper ? 0.1 : Math.max(0.45, wallDist - 0.25);
       smoothCamDist.current = THREE.MathUtils.damp(
         smoothCamDist.current,
         targetSafe,
-        18,
+        isScopedSniper ? 35 : 18,
         dt,
       );
       camera.position
@@ -570,7 +596,7 @@ const LocalPlayer = () => {
         .addScaledVector(toCamNorm, smoothCamDist.current);
 
       if (localCharGroupRef.current) {
-        localCharGroupRef.current.visible = !curMe?.isDead;
+        localCharGroupRef.current.visible = !curMe?.isDead && !isScopedSniper;
         localCharGroupRef.current.position.set(
           playerPos.current.x,
           localBodyY.current,

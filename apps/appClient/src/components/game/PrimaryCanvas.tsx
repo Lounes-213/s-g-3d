@@ -50,12 +50,15 @@ const PrimaryScene = () => {
 const PrimaryCanvas = () => {
   const setActivePage = useAppStore((state) => state.setActivePage);
   const theme = useSettingsStore((state) => state.theme);
+  const graphicsQuality = useSettingsStore((state) => state.graphicsQuality);
 
   useEffect(() => {
     setActivePage("ingame");
   }, [setActivePage]);
 
   const bgHex = theme === "light" ? "#cbe6ff" : "#090d16";
+  const dpr: [number, number] =
+    graphicsQuality === "low" ? [0.75, 1] : graphicsQuality === "high" ? [1, 1.8] : [1, 1.35];
 
   return (
     <div className="relative w-full h-full" style={{ backgroundColor: bgHex }}>
@@ -75,9 +78,9 @@ const PrimaryCanvas = () => {
       <ConnectionStateUI />
 
       <Canvas
-        shadows
-        dpr={[1, 1.35]}
-        gl={{ antialias: true, powerPreference: "high-performance" }}
+        shadows={graphicsQuality !== "low"}
+        dpr={dpr}
+        gl={{ antialias: graphicsQuality !== "low", powerPreference: "high-performance" }}
         style={{ backgroundColor: bgHex }}
       >
         <color attach="background" args={[bgHex]} />

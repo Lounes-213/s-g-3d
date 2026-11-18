@@ -265,7 +265,7 @@
         },
         "mapId": {
           "type": "string",
-          "enum": ["compound_05", "veridian_04", "citadel_01", "outpost_02", "nexus_03"],
+          "enum": ["compound_05", "veridian_04", "citadel_01", "outpost_02", "nexus_03", "titan_harbor", "aether_skyport", "crimson_foundry"],
           "maxLength": 24
         },
         "mode": {
@@ -411,7 +411,7 @@
         "deaths": { "type": "integer" },
         "currentWeapon": {
           "type": "string",
-          "enum": ["assaultRifle", "smg", "shotgun", "burstRifle", "sniper", "pistol"],
+          "enum": ["assaultRifle", "smg", "shotgun", "burstRifle", "sniper", "pistol", "dmr", "lmg", "vector", "revolver"],
           "maxLength": 16
         },
         "ammo": { "type": "integer" },

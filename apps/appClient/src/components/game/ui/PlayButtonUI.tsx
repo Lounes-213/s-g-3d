@@ -229,9 +229,9 @@ const PlayButtonUI = () => {
         {/* Quick Weapon Switch */}
         <div className="mb-5">
           <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-2">
-            Active Weapon Loadout
+            Active Weapon Loadout ({WEAPON_ORDER.length} Weapons)
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
             {WEAPON_ORDER.map((wId) => {
               const w = WEAPONS[wId];
               const active = me?.currentWeapon === wId;
@@ -240,7 +240,7 @@ const PlayButtonUI = () => {
                   key={wId}
                   type="button"
                   onClick={() => handleWeaponPick(wId)}
-                  className={`py-2 px-2 border text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`py-2 px-2 border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer truncate ${
                     active
                       ? "bg-sky-600 border-sky-500 text-white"
                       : isLight
@@ -248,7 +248,7 @@ const PlayButtonUI = () => {
                         : "bg-slate-900 border-white/10 text-slate-400 hover:text-white"
                   }`}
                 >
-                  {w.shortName}
+                  [{w.slot}] {w.shortName}
                 </button>
               );
             })}

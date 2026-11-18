@@ -106,7 +106,7 @@ export function WeaponModel3D({
             <meshStandardMaterial color={skin.bootColor} roughness={0.72} />
           </mesh>
 
-          {weaponId !== "pistol" && (
+          {weaponId !== "pistol" && weaponId !== "revolver" && (
             <group ref={leftHandRef}>
               <mesh
                 position={[-0.14, -0.18, 0.05]}

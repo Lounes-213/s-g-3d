@@ -10,7 +10,8 @@ const SkyBox = () => {
   const theme = useSettingsStore((state) => state.theme);
   const currentMap = MAPS[mapId] || MAPS.veridian_04;
 
-  const effectiveDay = theme === "light" || currentMap.isDaylight;
+  const isFoundry = currentMap.id === "crimson_foundry";
+  const effectiveDay = (theme === "light" && !isFoundry) || currentMap.isDaylight;
   const skyKey =
     theme === "light" && currentMap.skybox === "night"
       ? "afternoon"
@@ -22,27 +23,31 @@ const SkyBox = () => {
     return [s.px, s.nx, s.py, s.ny, s.pz, s.nz];
   }, [skyKey]);
 
-  const fogColor = theme === "light" ? currentMap.fogColor : "#1e293b";
+  const fogColor = isFoundry
+    ? "#261113"
+    : theme === "light"
+      ? currentMap.fogColor
+      : "#1e293b";
 
   return (
     <>
       <Environment
         files={skyFiles}
         background
-        environmentIntensity={effectiveDay ? 1.05 : 0.75}
+        environmentIntensity={effectiveDay ? 1.05 : isFoundry ? 0.92 : 0.75}
       />
       <fog attach="fog" args={[fogColor, 85, 240]} />
       <hemisphereLight
         args={[
-          effectiveDay ? "#f0f9ff" : "#94a3b8",
-          effectiveDay ? "#94a3b8" : "#334155",
-          effectiveDay ? 1.28 : 0.88,
+          isFoundry ? "#fdba74" : effectiveDay ? "#f0f9ff" : "#94a3b8",
+          isFoundry ? "#451a1a" : effectiveDay ? "#94a3b8" : "#334155",
+          effectiveDay ? 1.28 : isFoundry ? 1.08 : 0.88,
         ]}
       />
       <directionalLight
         position={[55, 85, 42]}
-        intensity={effectiveDay ? 2.25 : 1.45}
-        color={effectiveDay ? "#fff7ed" : "#e2e8f0"}
+        intensity={effectiveDay ? 2.25 : isFoundry ? 1.75 : 1.45}
+        color={isFoundry ? "#ffedd5" : effectiveDay ? "#fff7ed" : "#e2e8f0"}
         castShadow
         shadow-mapSize={[1024, 1024]}
         shadow-camera-left={-85}

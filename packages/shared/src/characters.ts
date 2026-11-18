@@ -1,3 +1,5 @@
+import type { WeaponId } from "./weapons.js";
+
 export type CharacterId =
   | "striker"
   | "ghost"
@@ -135,7 +137,7 @@ export interface CharacterConfig {
     | "commando"
     | "juggernaut"
     | "medic";
-  defaultWeapon: "assaultRifle" | "smg" | "shotgun" | "burstRifle" | "sniper" | "pistol";
+  defaultWeapon: WeaponId;
   defaultSkin: SkinId;
 }
 

@@ -24,14 +24,17 @@ import {
   Crosshair,
   Eye,
   Globe,
+  History,
   KeyRound,
   Lock,
   LogIn,
+  Maximize2,
   Moon,
   Palette,
   Play,
   Plus,
   RefreshCw,
+  RotateCw,
   Settings,
   Shield,
   Sun,
@@ -45,9 +48,11 @@ import { useAppStore } from "../stores/useAppStore";
 import { useAuthStore } from "../stores/useAuthStore";
 import { useGameStore, type PublicRoomSummary } from "../stores/useGameStore";
 import { useSettingsStore } from "../stores/useSettingsStore";
-import { signInOperator } from "../services/firebaseService";
+import { fetchGlobalLeaderboard, signInOperator, type OperatorProfile } from "../services/firebaseService";
 import { CharacterModel3D } from "../components/game/CharacterModel3D";
+import { WeaponArmoryModal, WeaponInspector3D } from "../components/game/WeaponInspector3D";
 import { listServerlessPublicRooms } from "../utils/serverlessRoomSync";
+import { getMatchHistory, type MatchHistoryEntry } from "../utils/matchHistory";
 import { soundEngine } from "../utils/soundEngine";
 import SideBar from "../components/SideBar";
 import { OperatorAvatar } from "../components/OperatorAvatar";
@@ -129,10 +134,28 @@ const WelcomePage = () => {
   const [rooms, setRooms] = useState<PublicRoomSummary[]>([]);
   const [refreshingRooms, setRefreshingRooms] = useState(false);
   const [activeModal, setActiveModal] = useState<"account" | "leaderboard" | "friends" | null>(null);
+  const [leaderboardTab, setLeaderboardTab] = useState<"leaderboard" | "players" | "history">("leaderboard");
+  const [showcaseMode, setShowcaseMode] = useState<"operator" | "weapon">("operator");
+  const [armoryModalOpen, setArmoryModalOpen] = useState(false);
+  const [lobbyOperators, setLobbyOperators] = useState<OperatorProfile[]>([]);
+  const [recentMatches] = useState<MatchHistoryEntry[]>(() => getMatchHistory());
 
   useEffect(() => {
     setActivePage("welcome");
   }, [setActivePage]);
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    let active = true;
+    fetchGlobalLeaderboard(24)
+      .then((list) => {
+        if (active) setLobbyOperators(list);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [firebaseUser, profile]);
 
   const fetchRooms = () => {
     setRefreshingRooms(true);
@@ -300,7 +323,9 @@ const WelcomePage = () => {
       <SideBar />
 
       {activeModal === "account" && <AccountModal onClose={() => setActiveModal(null)} />}
-      {activeModal === "leaderboard" && <LeaderboardModal onClose={() => setActiveModal(null)} />}
+      {activeModal === "leaderboard" && (
+        <LeaderboardModal onClose={() => setActiveModal(null)} initialTab={leaderboardTab} />
+      )}
       {activeModal === "friends" && (
         <FriendsModal
           onClose={() => setActiveModal(null)}
@@ -311,6 +336,16 @@ const WelcomePage = () => {
           currentMode={mode}
         />
       )}
+      <WeaponArmoryModal
+        isOpen={armoryModalOpen}
+        onClose={() => setArmoryModalOpen(false)}
+        weaponId={weaponId}
+        onSelectWeapon={(id) => {
+          setWeaponId(id);
+          soundEngine.playClick();
+        }}
+        skinId={skinId}
+      />
 
       {/* Architectural Grid Backdrop */}
       <div
@@ -399,10 +434,11 @@ const WelcomePage = () => {
               </span>
             </button>
 
-            {/* Leaderboard Button */}
+            {/* Leaderboard & Directory Button */}
             <button
               onClick={() => {
                 soundEngine.playClick();
+                setLeaderboardTab("leaderboard");
                 setActiveModal("leaderboard");
               }}
               className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-black uppercase tracking-wider cursor-pointer ${
@@ -412,7 +448,24 @@ const WelcomePage = () => {
               }`}
             >
               <Trophy size={14} className="text-amber-500" />
-              <span>Ranks</span>
+              <span>Ranks & Players</span>
+            </button>
+
+            {/* Match Results Button */}
+            <button
+              onClick={() => {
+                soundEngine.playClick();
+                setLeaderboardTab("history");
+                setActiveModal("leaderboard");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-black uppercase tracking-wider cursor-pointer ${
+                isLight
+                  ? "bg-white border-slate-300 hover:border-emerald-500 text-slate-800"
+                  : "bg-slate-900 border-white/20 hover:border-emerald-400 text-white"
+              }`}
+            >
+              <History size={14} className="text-emerald-500" />
+              <span>Results</span>
             </button>
 
             {/* Friends & Room Invites Button */}
@@ -784,9 +837,9 @@ const WelcomePage = () => {
               <section className={`border p-4 sm:p-5 space-y-4 ${cardBg}`}>
                 <div>
                   <h2 className={`text-xs font-black uppercase tracking-[0.22em] mb-2.5 ${mutedText}`}>
-                    2. Select Tactical Arena Map
+                    2. Select Tactical Arena Map ({MAP_ORDER.length} Maps)
                   </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
                     {MAP_ORDER.map((id, idx) => {
                       const m = MAPS[id];
                       const active = mapId === id;
@@ -888,19 +941,32 @@ const WelcomePage = () => {
 
             {/* 3. Primary Weapon Armory */}
             <section className={`border p-4 sm:p-5 ${cardBg}`}>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h2 className={`text-xs font-black uppercase tracking-[0.22em] ${mutedText}`}>
-                  3. Starting Weapon Loadout (All 6 In-Game)
+                  3. Starting Weapon Loadout (All {WEAPON_ORDER.length} In-Game)
                 </h2>
-                <button
-                  onClick={() => soundEngine.playWeaponFire(weaponId)}
-                  className="flex items-center gap-1.5 text-[11px] font-black uppercase text-sky-600 hover:underline cursor-pointer"
-                >
-                  <Volume2 size={14} /> Test Fire Sound
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setArmoryModalOpen(true);
+                    }}
+                    className="flex items-center gap-1 text-[11px] font-black uppercase text-amber-500 hover:underline cursor-pointer"
+                  >
+                    <RotateCw size={13} /> 360° Inspect
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => soundEngine.playWeaponFire(weaponId)}
+                    className="flex items-center gap-1 text-[11px] font-black uppercase text-sky-600 hover:underline cursor-pointer"
+                  >
+                    <Volume2 size={14} /> Test Fire
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
                 {WEAPON_ORDER.map((wId) => {
                   const w = WEAPONS[wId];
                   const active = weaponId === wId;
@@ -911,7 +977,7 @@ const WelcomePage = () => {
                         setWeaponId(wId);
                         soundEngine.playWeaponFire(wId);
                       }}
-                      className={`p-2.5 border text-left cursor-pointer transition-all ${
+                      className={`p-2 border text-left cursor-pointer transition-all ${
                         active
                           ? isLight
                             ? "bg-slate-900 border-slate-900 text-white"
@@ -922,8 +988,11 @@ const WelcomePage = () => {
                         active ? { borderLeftWidth: "4px", borderLeftColor: w.accentColor } : undefined
                       }
                     >
-                      <div className="text-[9px] font-bold uppercase opacity-70">{w.category}</div>
-                      <div className="text-xs sm:text-sm font-black uppercase">{w.name}</div>
+                      <div className="flex items-center justify-between text-[9px] font-bold uppercase opacity-70">
+                        <span className="truncate">{w.category}</span>
+                        <span>[{w.slot}]</span>
+                      </div>
+                      <div className="text-xs font-black uppercase truncate">{w.shortName}</div>
                     </button>
                   );
                 })}
@@ -949,46 +1018,104 @@ const WelcomePage = () => {
 
           {/* RIGHT COLUMN (5 cols): 3D Operator Preview, Skins, Character Selector & Launch CTA */}
           <div className="lg:col-span-5 flex flex-col gap-4">
-            {/* Live 3D Operator, Skin & Weapon Showcase */}
+            {/* Live 3D Operator / 360° Weapon Showcase */}
             <section
-              className={`relative h-72 sm:h-80 border overflow-hidden ${
+              className={`relative h-80 sm:h-96 border overflow-hidden flex flex-col ${
                 isLight
                   ? "bg-gradient-to-b from-sky-100 via-sky-50 to-slate-200 border-slate-300"
                   : "bg-gradient-to-b from-slate-900 to-slate-950 border-white/15"
               }`}
             >
-              <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-sky-600 text-[10px] font-black uppercase tracking-widest text-white">
-                  {selectedChar.codename}
-                </span>
-                <span className="text-xs font-black uppercase opacity-80">
-                  {selectedSkin.name}
-                </span>
+              {/* Showcase Switcher Bar */}
+              <div className="flex items-center justify-between px-3 py-2 border-b border-current/10 z-20 bg-slate-950/85 text-white">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setShowcaseMode("operator");
+                    }}
+                    className={`px-2.5 py-1 text-[10px] font-black uppercase cursor-pointer transition-colors ${
+                      showcaseMode === "operator"
+                        ? "bg-sky-600 text-white"
+                        : "bg-slate-800 text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    Operator 3D
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setShowcaseMode("weapon");
+                    }}
+                    className={`px-2.5 py-1 text-[10px] font-black uppercase flex items-center gap-1 cursor-pointer transition-colors ${
+                      showcaseMode === "weapon"
+                        ? "bg-amber-500 text-slate-950"
+                        : "bg-slate-800 text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    <RotateCw size={11} /> Weapon 360°
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playClick();
+                    setArmoryModalOpen(true);
+                  }}
+                  className="px-2 py-1 text-[10px] font-black uppercase bg-slate-800 hover:bg-slate-700 text-sky-400 flex items-center gap-1 cursor-pointer"
+                >
+                  <Maximize2 size={11} /> Full 360° Armory
+                </button>
               </div>
 
-              <Canvas camera={{ position: [0, 0.55, 3.0], fov: 42 }}>
-                <ambientLight intensity={isLight ? 1.1 : 0.75} />
-                <directionalLight position={[3, 5, 4]} intensity={isLight ? 2.0 : 1.7} />
-                <pointLight position={[-3, 2, 2]} intensity={0.8} color="#38bdf8" />
-                <Suspense fallback={null}>
-                  <RotatingOperatorPreview
-                    characterId={characterId}
-                    skinId={skinId}
+              {showcaseMode === "weapon" ? (
+                <div className="flex-1 min-h-0">
+                  <WeaponInspector3D
                     weaponId={weaponId}
+                    skinId={skinId}
+                    compact
+                    onExpand={() => setArmoryModalOpen(true)}
                   />
-                </Suspense>
-              </Canvas>
+                </div>
+              ) : (
+                <div className="relative flex-1">
+                  <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-sky-600 text-[10px] font-black uppercase tracking-widest text-white">
+                      {selectedChar.codename}
+                    </span>
+                    <span className="text-xs font-black uppercase opacity-80">
+                      {selectedSkin.name}
+                    </span>
+                  </div>
 
-              <div
-                className={`absolute bottom-0 inset-x-0 p-3.5 ${
-                  isLight
-                    ? "bg-gradient-to-t from-white via-white/90 to-transparent text-slate-900"
-                    : "bg-gradient-to-t from-slate-950 via-slate-950/85 to-transparent text-white"
-                }`}
-              >
-                <div className="text-sm font-black uppercase">{selectedChar.name}</div>
-                <p className="text-[11px] opacity-80">{selectedChar.description}</p>
-              </div>
+                  <Canvas camera={{ position: [0, 0.55, 3.0], fov: 42 }}>
+                    <ambientLight intensity={isLight ? 1.1 : 0.75} />
+                    <directionalLight position={[3, 5, 4]} intensity={isLight ? 2.0 : 1.7} />
+                    <pointLight position={[-3, 2, 2]} intensity={0.8} color="#38bdf8" />
+                    <Suspense fallback={null}>
+                      <RotatingOperatorPreview
+                        characterId={characterId}
+                        skinId={skinId}
+                        weaponId={weaponId}
+                      />
+                    </Suspense>
+                  </Canvas>
+
+                  <div
+                    className={`absolute bottom-0 inset-x-0 p-3.5 ${
+                      isLight
+                        ? "bg-gradient-to-t from-white via-white/90 to-transparent text-slate-900"
+                        : "bg-gradient-to-t from-slate-950 via-slate-950/85 to-transparent text-white"
+                    }`}
+                  >
+                    <div className="text-sm font-black uppercase">{selectedChar.name}</div>
+                    <p className="text-[11px] opacity-80">{selectedChar.description}</p>
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* Character Skins Picker */}
@@ -1096,6 +1223,105 @@ const WelcomePage = () => {
             </button>
           </div>
         </div>
+
+        {/* OPERATORS DIRECTORY & RECENT MATCH RESULTS BAR */}
+        <section className={`border p-4 grid grid-cols-1 lg:grid-cols-2 gap-4 ${cardBg}`}>
+          {/* Entered Operators Snapshot */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest">
+                <Users size={14} className="text-sky-500" />
+                <span>Entered Operators ({lobbyOperators.length})</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  setLeaderboardTab("players");
+                  setActiveModal("leaderboard");
+                }}
+                className="text-[10px] font-black uppercase text-sky-500 hover:underline cursor-pointer"
+              >
+                View All Players
+              </button>
+            </div>
+            {!firebaseUser ? (
+              <div className={`p-3 border text-xs ${subCardBg}`}>
+                Sign in with Google to view all entered players & live ranked standings.
+              </div>
+            ) : lobbyOperators.length === 0 ? (
+              <div className={`p-3 border text-xs ${subCardBg}`}>
+                Loading registered operators...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {lobbyOperators.slice(0, 6).map((op, i) => (
+                  <div
+                    key={op.uid}
+                    className={`px-2.5 py-1.5 border flex items-center justify-between text-xs ${subCardBg}`}
+                  >
+                    <div className="truncate">
+                      <span className="font-black text-amber-500 mr-1.5">#{i + 1}</span>
+                      <span className="font-bold">{op.username}</span>
+                    </div>
+                    <div className="text-[10px] font-black text-sky-500 shrink-0 ml-2">
+                      {op.rankPoints} PTS • {op.kills}K
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Recent Match Results Snapshot */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest">
+                <History size={14} className="text-emerald-500" />
+                <span>Recent Match Results ({recentMatches.length})</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  setLeaderboardTab("history");
+                  setActiveModal("leaderboard");
+                }}
+                className="text-[10px] font-black uppercase text-emerald-500 hover:underline cursor-pointer"
+              >
+                Full Results Board
+              </button>
+            </div>
+            {recentMatches.length === 0 ? (
+              <div className={`p-3 border text-xs ${subCardBg}`}>
+                No matches finished yet. Deploy to record your match score, MVP, and K/D history!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {recentMatches.slice(0, 4).map((m) => (
+                  <div
+                    key={m.id}
+                    className={`px-2.5 py-1.5 border flex items-center justify-between text-xs ${subCardBg}`}
+                  >
+                    <div className="truncate">
+                      <span
+                        className={`px-1.5 py-0.2 text-[9px] font-black uppercase mr-1.5 ${
+                          m.didWin ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+                        }`}
+                      >
+                        {m.didWin ? "WIN" : "LOSS"}
+                      </span>
+                      <span className="font-bold">{m.mapName}</span>
+                    </div>
+                    <div className="text-[10px] font-black opacity-80 shrink-0 ml-2">
+                      {m.kills}K/{m.deaths}D • {m.scoreText}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </main>
   );

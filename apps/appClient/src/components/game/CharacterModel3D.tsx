@@ -291,7 +291,7 @@ export function CharacterModel3D({
     }
 
     // 4. Upper Torso & Head: Counter-rotate pelvis heading so shoulders/weapon always aim straight forward (-Z)
-    const isOneHand = weaponId === "pistol";
+    const isOneHand = weaponId === "pistol" || weaponId === "revolver";
     const sprintingWeaponCarry = isSprinting && isMoving && !isAiming && !isReloading;
 
     // Slight bladed combat stance (-0.16 rad twists right shoulder slightly back so rifle tucks cleanly)

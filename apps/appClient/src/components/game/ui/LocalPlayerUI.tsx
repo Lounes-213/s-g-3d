@@ -342,7 +342,7 @@ const LocalPlayerUI = () => {
             </div>
           )}
 
-          {/* BOTTOM RIGHT: Active Weapon & 6-Slot Tactical Arsenal */}
+          {/* BOTTOM RIGHT: Active Weapon & 10-Slot Tactical Arsenal */}
           <div className="flex flex-col items-end gap-2">
             <div
               className={`border border-r-4 px-5 py-3 min-w-[250px] ${panelClass}`}
@@ -375,7 +375,7 @@ const LocalPlayerUI = () => {
             </div>
 
             {showControls && (
-              <div className="flex gap-1">
+              <div className="flex flex-wrap justify-end gap-1 max-w-md">
                 {WEAPON_ORDER.map((wId, idx) => {
                   const w = WEAPONS[wId];
                   const isSelected = me.currentWeapon === wId;
@@ -384,7 +384,7 @@ const LocalPlayerUI = () => {
                   return (
                     <div
                       key={wId}
-                      className={`px-2 py-1 border text-[10px] font-black uppercase tracking-wider transition-all ${
+                      className={`px-1.5 py-0.5 border text-[9px] font-black uppercase tracking-wider transition-all ${
                         isSelected
                           ? isLight
                             ? "bg-slate-900 border-slate-900 text-white"

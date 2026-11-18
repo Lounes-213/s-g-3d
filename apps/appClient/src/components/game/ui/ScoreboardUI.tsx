@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { useGameStore } from "../../../stores/useGameStore";
 import { useSettingsStore } from "../../../stores/useSettingsStore";
 import { CHARACTERS } from "@block-shooter/shared";
+import { Award, Crown } from "lucide-react";
 
 const ScoreboardUI = () => {
   const players = useGameStore((state) => state.players);
   const localId = useGameStore((state) => state.localId);
   const matchState = useGameStore((state) => state.matchState);
   const mode = useGameStore((state) => state.mode);
+  const teamScores = useGameStore((state) => state.teamScores);
   const roomId = useGameStore((state) => state.roomId);
   const isLocked = useGameStore((state) => state.isLocked);
   const scoreboardKey = useSettingsStore((state) => state.keybindings.scoreboard);
@@ -47,6 +49,80 @@ const ScoreboardUI = () => {
     id,
     ...data,
   }));
+
+  const me = localId ? allPlayers.find((p) => p.id === localId) : null;
+  const mvp = [...allPlayers].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths)[0];
+
+  let outcomeLabel = "MATCH COMPLETE";
+  let outcomeTone = "bg-sky-600 text-white border-sky-400";
+  if (matchState === "ended" && me) {
+    const topKills = Math.max(...allPlayers.map((p) => p.kills), 0);
+    const didWin =
+      mode === "br"
+        ? !me.isDead
+        : mode === "ffa"
+          ? me.kills >= topKills && me.kills > 0
+          : me.team === "red"
+            ? teamScores.red >= teamScores.blue
+            : teamScores.blue >= teamScores.red;
+    outcomeLabel = didWin ? "VICTORY" : "DEFEAT";
+    outcomeTone = didWin
+      ? "bg-emerald-600/95 text-white border-emerald-400"
+      : "bg-rose-600/95 text-white border-rose-400";
+  }
+
+  const postMatchBanner =
+    matchState === "ended" ? (
+      <div className="mb-3 grid grid-cols-1 md:grid-cols-3 gap-2.5">
+        <div className={`md:col-span-2 border-2 px-4 py-3 flex items-center justify-between ${outcomeTone}`}>
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.28em] opacity-85">
+              Post-Match Results • {mode.toUpperCase()}
+            </div>
+            <div className="text-2xl sm:text-3xl font-black uppercase tracking-widest">
+              {outcomeLabel}
+            </div>
+          </div>
+          <div className="text-right">
+            {mode === "tdm" || mode === "domination" ? (
+              <div className="text-lg font-black uppercase">
+                BLUE {teamScores.blue} — {teamScores.red} RED
+              </div>
+            ) : (
+              <div className="text-lg font-black uppercase">
+                {me ? `${me.kills} KILLS • ${me.deaths} DEATHS` : "FINAL STANDINGS"}
+              </div>
+            )}
+            <div className="text-[10px] uppercase tracking-wider opacity-85">
+              Next round launching in 5s...
+            </div>
+          </div>
+        </div>
+
+        {mvp && (
+          <div
+            className={`border-2 px-4 py-3 flex items-center justify-between ${
+              isLight
+                ? "bg-amber-50 border-amber-400 text-slate-900"
+                : "bg-slate-950/95 border-amber-400/70 text-white"
+            }`}
+          >
+            <div>
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-amber-500">
+                <Crown size={12} /> Match MVP
+              </div>
+              <div className="text-base font-black uppercase truncate max-w-[160px]">
+                {mvp.name}
+              </div>
+              <div className="text-[11px] opacity-75">
+                {mvp.kills}K / {mvp.deaths}D ({(mvp.kills / Math.max(1, mvp.deaths)).toFixed(2)} K/D)
+              </div>
+            </div>
+            <Award size={28} className="text-amber-500 shrink-0" />
+          </div>
+        )}
+      </div>
+    ) : null;
 
   const renderTable = (
     title: string,
@@ -137,7 +213,8 @@ const ScoreboardUI = () => {
     });
     return (
       <div className="absolute inset-0 z-40 flex items-center justify-center p-8 pointer-events-none">
-        <div className="w-full max-w-3xl bg-black/50 p-4 shadow-2xl">
+        <div className="w-full max-w-4xl bg-black/55 p-4 shadow-2xl">
+          {postMatchBanner}
           {renderTable(
             mode === "br" ? "Battle Royale Standings" : "Free-For-All Standings",
             sorted,
@@ -158,7 +235,8 @@ const ScoreboardUI = () => {
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center p-8 pointer-events-none">
-      <div className="w-full max-w-5xl bg-black/55 p-4 shadow-2xl space-y-3">
+      <div className="w-full max-w-5xl bg-black/60 p-4 shadow-2xl space-y-3">
+        {postMatchBanner}
         <div className="flex items-center justify-between text-xs font-black uppercase tracking-widest text-white/80 px-1">
           <span>ROOM CODE: {roomId}</span>
           <span>Press ESC to switch side or loadout</span>

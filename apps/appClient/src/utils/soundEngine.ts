@@ -144,20 +144,32 @@ class TacticalSoundEngine {
     } else {
       // Distance-filtered gunshot punch + crisp audio sample
       const jitter = 0.94 + Math.random() * 0.12;
-      if (weaponId === "assaultRifle" || weaponId === "smg") {
+      if (weaponId === "assaultRifle" || weaponId === "smg" || weaponId === "lmg") {
         this.playBuffer(
           "assaultRifleFire",
-          vol * 0.8,
-          (weaponId === "smg" ? 1.34 : 1.0) * jitter,
+          vol * (weaponId === "lmg" ? 0.92 : 0.8),
+          (weaponId === "smg" ? 1.34 : weaponId === "lmg" ? 0.82 : 1.0) * jitter,
           now,
         );
-      } else if (weaponId === "burstRifle") {
-        this.playBuffer("burstRifleFire", vol * 0.78, jitter, now);
+      } else if (weaponId === "vector") {
+        this.playBuffer("assaultRifleFire", vol * 0.56, 1.56 * jitter, now);
+      } else if (weaponId === "burstRifle" || weaponId === "dmr") {
+        this.playBuffer(
+          "burstRifleFire",
+          vol * (weaponId === "dmr" ? 0.9 : 0.78),
+          (weaponId === "dmr" ? 0.74 : 1.0) * jitter,
+          now,
+        );
       } else if (weaponId === "sniper") {
         this.playBuffer("thunder", vol * 0.52, 1.5, now);
         this.playBuffer("pistolFire", vol * 0.85, 0.48, now);
-      } else if (weaponId === "shotgun") {
-        this.playBuffer("pistolFire", vol * 0.88, 0.58 * jitter, now);
+      } else if (weaponId === "shotgun" || weaponId === "revolver") {
+        this.playBuffer(
+          "pistolFire",
+          vol * 0.88,
+          (weaponId === "revolver" ? 0.66 : 0.58) * jitter,
+          now,
+        );
       } else {
         this.playBuffer("pistolFire", vol * 0.82, jitter, now);
       }
@@ -172,7 +184,10 @@ class TacticalSoundEngine {
       filter.frequency.exponentialRampToValueAtTime(220, now + 0.18);
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(vol * 0.52, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + (weaponId === "sniper" ? 0.36 : 0.19));
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        now + (weaponId === "sniper" ? 0.36 : weaponId === "dmr" ? 0.25 : 0.19),
+      );
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
@@ -191,12 +206,22 @@ class TacticalSoundEngine {
 
     if (weaponId === "assaultRifle") {
       this.playBuffer("assaultRifleFire", vol * 0.8, jitter, now);
+    } else if (weaponId === "lmg") {
+      this.playBuffer("assaultRifleFire", vol * 0.92, 0.82 * jitter, now);
     } else if (weaponId === "smg") {
       this.playBuffer("assaultRifleFire", vol * 0.6, 1.38 * jitter, now);
+    } else if (weaponId === "vector") {
+      // Suppressed rapid thump
+      this.playBuffer("assaultRifleFire", vol * 0.45, 1.58 * jitter, now);
     } else if (weaponId === "burstRifle") {
       this.playBuffer("burstRifleFire", vol * 0.78, jitter, now);
+    } else if (weaponId === "dmr") {
+      this.playBuffer("burstRifleFire", vol * 0.9, 0.72 * jitter, now);
     } else if (weaponId === "pistol") {
       this.playBuffer("pistolFire", vol * 0.85, jitter, now);
+    } else if (weaponId === "revolver") {
+      this.playBuffer("pistolFire", vol * 0.94, 0.65 * jitter, now);
+      this.scheduleClick(ctx, now + 0.18, 2400, 0.035, vol * 0.24);
     } else if (weaponId === "shotgun") {
       this.playBuffer("pistolFire", vol * 0.9, 0.58 * jitter, now);
       this.scheduleClick(ctx, now + 0.25, 1400, 0.05, vol * 0.28);
@@ -214,49 +239,53 @@ class TacticalSoundEngine {
     const osc = ctx.createOscillator();
     const oscGain = ctx.createGain();
 
-    if (weaponId === "sniper") {
+    if (weaponId === "sniper" || weaponId === "dmr") {
+      const isDmr = weaponId === "dmr";
       filter.type = "bandpass";
-      filter.frequency.setValueAtTime(1850, now);
-      filter.frequency.exponentialRampToValueAtTime(160, now + 0.55);
-      gain.gain.setValueAtTime(vol * 0.95, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      filter.frequency.setValueAtTime(isDmr ? 1650 : 1850, now);
+      filter.frequency.exponentialRampToValueAtTime(160, now + (isDmr ? 0.32 : 0.55));
+      gain.gain.setValueAtTime(vol * (isDmr ? 0.75 : 0.95), now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + (isDmr ? 0.36 : 0.6));
 
       osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(195, now);
-      osc.frequency.exponentialRampToValueAtTime(34, now + 0.28);
-      oscGain.gain.setValueAtTime(vol * 0.75, now);
-      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.frequency.setValueAtTime(isDmr ? 210 : 195, now);
+      osc.frequency.exponentialRampToValueAtTime(40, now + (isDmr ? 0.18 : 0.28));
+      oscGain.gain.setValueAtTime(vol * (isDmr ? 0.55 : 0.75), now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + (isDmr ? 0.2 : 0.3));
       noise.start(now);
-      noise.stop(now + 0.62);
+      noise.stop(now + (isDmr ? 0.38 : 0.62));
       osc.start(now);
-      osc.stop(now + 0.32);
-    } else if (weaponId === "shotgun") {
+      osc.stop(now + (isDmr ? 0.22 : 0.32));
+    } else if (weaponId === "shotgun" || weaponId === "revolver") {
       filter.type = "lowpass";
-      filter.frequency.setValueAtTime(2600, now);
-      filter.frequency.exponentialRampToValueAtTime(190, now + 0.36);
-      gain.gain.setValueAtTime(vol * 0.95, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+      filter.frequency.setValueAtTime(weaponId === "revolver" ? 2900 : 2600, now);
+      filter.frequency.exponentialRampToValueAtTime(190, now + 0.32);
+      gain.gain.setValueAtTime(vol * 0.9, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
 
       osc.type = "triangle";
-      osc.frequency.setValueAtTime(140, now);
-      osc.frequency.exponentialRampToValueAtTime(30, now + 0.22);
-      oscGain.gain.setValueAtTime(vol * 0.8, now);
-      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+      osc.frequency.setValueAtTime(weaponId === "revolver" ? 175 : 140, now);
+      osc.frequency.exponentialRampToValueAtTime(34, now + 0.2);
+      oscGain.gain.setValueAtTime(vol * 0.76, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
       noise.start(now);
-      noise.stop(now + 0.4);
+      noise.stop(now + 0.36);
       osc.start(now);
-      osc.stop(now + 0.25);
+      osc.stop(now + 0.23);
     } else {
-      const dur = weaponId === "smg" ? 0.08 : 0.14;
-      filter.type = "bandpass";
-      filter.frequency.setValueAtTime(weaponId === "smg" ? 2400 : 1850, now);
-      filter.frequency.exponentialRampToValueAtTime(380, now + dur);
-      gain.gain.setValueAtTime(vol * 0.42, now);
+      const dur = weaponId === "smg" || weaponId === "vector" ? 0.075 : weaponId === "lmg" ? 0.16 : 0.14;
+      filter.type = weaponId === "vector" ? "lowpass" : "bandpass";
+      filter.frequency.setValueAtTime(
+        weaponId === "vector" ? 1350 : weaponId === "smg" ? 2400 : weaponId === "lmg" ? 1550 : 1850,
+        now,
+      );
+      filter.frequency.exponentialRampToValueAtTime(320, now + dur);
+      gain.gain.setValueAtTime(vol * (weaponId === "vector" ? 0.26 : 0.42), now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
 
       osc.type = "triangle";
-      osc.frequency.setValueAtTime(220, now);
-      osc.frequency.exponentialRampToValueAtTime(52, now + 0.09);
+      osc.frequency.setValueAtTime(weaponId === "lmg" ? 185 : 220, now);
+      osc.frequency.exponentialRampToValueAtTime(48, now + 0.09);
       oscGain.gain.setValueAtTime(vol * 0.38, now);
       oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
       noise.start(now);
@@ -298,6 +327,10 @@ class TacticalSoundEngine {
       burstRifle: [1150, 260, 0.12],
       sniper: [1480, 75, 0.42],
       pistol: [680, 130, 0.16],
+      dmr: [1220, 110, 0.24],
+      lmg: [640, 115, 0.15],
+      vector: [1320, 320, 0.07],
+      revolver: [520, 82, 0.24],
     };
 
     const [startF, endF, dur] = pitchMap[weaponId];
@@ -332,10 +365,15 @@ class TacticalSoundEngine {
     noise.buffer = this.getNoiseBuffer(ctx);
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = weaponId === "sniper" ? 1200 : 1800;
+    filter.frequency.value = weaponId === "sniper" || weaponId === "dmr" ? 1200 : 1800;
 
     const gain = ctx.createGain();
-    const dur = weaponId === "sniper" ? 0.35 : weaponId === "shotgun" ? 0.28 : 0.12;
+    const dur =
+      weaponId === "sniper"
+        ? 0.35
+        : weaponId === "shotgun" || weaponId === "revolver"
+          ? 0.28
+          : 0.12;
     gain.gain.setValueAtTime(vol * 0.75, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
 

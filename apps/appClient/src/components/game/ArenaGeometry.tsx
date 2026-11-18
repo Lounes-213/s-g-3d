@@ -552,7 +552,11 @@ function PerimeterHorizonProps({
   const rockRef = useRef<THREE.InstancedMesh>(null);
 
   const isDesert = mapId === "outpost_02";
-  const isCyber = mapId === "nexus_03";
+  const isCyber =
+    mapId === "nexus_03" ||
+    mapId === "titan_harbor" ||
+    mapId === "aether_skyport" ||
+    mapId === "crimson_foundry";
 
   const { treeTransforms, rockTransforms } = useMemo(() => {
     const trees: Array<{ x: number; z: number; scale: number; rotY: number }> = [];
@@ -820,9 +824,16 @@ const ArenaGeometry = () => {
               ? "#cfa974"
               : currentMap.id === "nexus_03"
                 ? "#1e293b"
-                : "#5e914f"
+                : currentMap.id === "titan_harbor"
+                  ? "#1e4d6b"
+                  : currentMap.id === "aether_skyport"
+                    ? "#cbd5e1"
+                    : currentMap.id === "crimson_foundry"
+                      ? "#291918"
+                      : "#5e914f"
           }
-          roughness={0.94}
+          roughness={currentMap.id === "titan_harbor" ? 0.35 : 0.94}
+          metalness={currentMap.id === "titan_harbor" ? 0.2 : 0.02}
         />
       </mesh>
       <PerimeterHorizonProps

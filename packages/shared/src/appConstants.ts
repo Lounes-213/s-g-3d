@@ -1,3 +1,5 @@
+import type { WeaponId } from "./weapons.js";
+
 export const GRAVITY = { x: 0, y: -30, z: 0 };
 
 export const PHYSICS_CONFIG = {
@@ -36,7 +38,7 @@ export type RankTier = "Bronze" | "Silver" | "Gold" | "Platinum" | "Diamond" | "
 export interface LootPickup {
   id: string;
   kind: "medkit" | "armor" | "ammo" | "weapon";
-  weaponId?: "assaultRifle" | "smg" | "shotgun" | "burstRifle" | "sniper" | "pistol";
+  weaponId?: WeaponId;
   x: number;
   y: number;
   z: number;

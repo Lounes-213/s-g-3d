@@ -91,6 +91,7 @@ export interface OperatorProfile {
   deaths: number;
   wins: number;
   matchesPlayed: number;
+  updatedAtMs?: number;
 }
 
 export interface FriendEntry {
@@ -202,10 +203,18 @@ export async function ensureOperatorProfile(
       handleFirestoreError(err, OperationType.CREATE, privatePath);
     }
 
-    return newProfile;
+    return { ...newProfile, updatedAtMs: Date.now() };
   }
 
-  return profile;
+  try {
+    await updateDoc(doc(db, "users", uid), {
+      updatedAt: serverTimestamp(),
+    });
+  } catch {
+    // Non-fatal if timestamp refresh fails offline
+  }
+
+  return { ...profile, updatedAtMs: Date.now() };
 }
 
 export async function updateOperatorIdentity(
@@ -270,17 +279,28 @@ export async function recordMatchStats(
   }
 }
 
-export async function fetchGlobalLeaderboard(): Promise<OperatorProfile[]> {
+export async function fetchGlobalLeaderboard(limitCount = 100): Promise<OperatorProfile[]> {
   const path = "users";
   try {
     const q = query(
       collection(db, "users"),
       where("rankPoints", ">=", 0),
       orderBy("rankPoints", "desc"),
-      limit(25),
+      limit(limitCount),
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => d.data() as OperatorProfile);
+    return snap.docs.map((d) => {
+      const data = d.data() as OperatorProfile & {
+        updatedAt?: { toMillis?: () => number };
+        createdAt?: { toMillis?: () => number };
+      };
+      const updatedAtMs =
+        data.updatedAt?.toMillis?.() ?? data.createdAt?.toMillis?.() ?? undefined;
+      return {
+        ...data,
+        updatedAtMs,
+      };
+    });
   } catch (err) {
     return handleFirestoreError(err, OperationType.LIST, path);
   }
