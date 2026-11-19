@@ -91,14 +91,14 @@ class TacticalSoundEngine {
     this.getContext();
   }
 
-  public playWeaponFire(weaponId: WeaponId) {
+  public playWeaponFire(weaponId: WeaponId, isSuppressed = false) {
     const settings = useSettingsStore.getState();
     const custom = settings.customWeaponSounds[weaponId];
 
     if (custom?.dataUrl) {
       try {
         const audio = new Audio(custom.dataUrl);
-        audio.volume = this.getVolume(0.9);
+        audio.volume = this.getVolume(isSuppressed ? 0.55 : 0.9);
         audio.play().catch(() => {});
         return;
       } catch {
@@ -110,12 +110,14 @@ class TacticalSoundEngine {
     if (!ctx) return;
 
     const pack = settings.soundPack;
-    const vol = this.getVolume(0.85);
+    const vol = this.getVolume(0.88);
     if (vol <= 0.001) return;
 
     const now = ctx.currentTime;
 
-    if (pack === "scifi") {
+    if (isSuppressed) {
+      this.playSuppressedShot(ctx, now, weaponId, vol);
+    } else if (pack === "scifi") {
       this.playSciFiShot(ctx, now, weaponId, vol);
     } else if (pack === "classic") {
       this.playClassicShot(ctx, now, weaponId, vol);
@@ -124,7 +126,50 @@ class TacticalSoundEngine {
     }
   }
 
-  public playSpatialWeaponFire(weaponId: WeaponId, distance: number, maxRange = 90) {
+  private playSuppressedShot(
+    ctx: AudioContext,
+    now: number,
+    weaponId: WeaponId,
+    vol: number,
+  ) {
+    // Authentic suppressed pneumatic "psst-thump" + crisp metallic bolt cycle
+    const noise = ctx.createBufferSource();
+    noise.buffer = this.getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.Q.value = 1.4;
+    filter.frequency.setValueAtTime(
+      weaponId === "sniper" || weaponId === "kar98" ? 1400 : 2100,
+      now,
+    );
+    filter.frequency.exponentialRampToValueAtTime(340, now + 0.09);
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol * 0.52, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+    noise.connect(filter);
+    filter.connect(g);
+    g.connect(ctx.destination);
+    noise.start(now);
+    noise.stop(now + 0.12);
+
+    const osc = ctx.createOscillator();
+    const og = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(165, now);
+    osc.frequency.exponentialRampToValueAtTime(52, now + 0.075);
+    og.gain.setValueAtTime(vol * 0.48, now);
+    og.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
+    osc.connect(og);
+    og.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.09);
+
+    // Crisp mechanical bolt click
+    this.scheduleClick(ctx, now + 0.025, 2900, 0.02, vol * 0.24);
+  }
+
+  public playSpatialWeaponFire(weaponId: WeaponId, distance: number, maxRange = 130) {
     if (distance > maxRange) return;
     const ctx = this.getContext();
     if (!ctx) return;
@@ -142,15 +187,24 @@ class TacticalSoundEngine {
     } else if (settings.soundPack === "classic") {
       this.playClassicShot(ctx, now, weaponId, vol);
     } else {
-      // Distance-filtered gunshot punch + crisp audio sample
       const jitter = 0.94 + Math.random() * 0.12;
-      if (weaponId === "assaultRifle" || weaponId === "smg" || weaponId === "lmg") {
-        this.playBuffer(
-          "assaultRifleFire",
-          vol * (weaponId === "lmg" ? 0.92 : 0.8),
-          (weaponId === "smg" ? 1.34 : weaponId === "lmg" ? 0.82 : 1.0) * jitter,
-          now,
-        );
+      if (
+        weaponId === "assaultRifle" ||
+        weaponId === "ak74m" ||
+        weaponId === "scarH" ||
+        weaponId === "smg" ||
+        weaponId === "p90" ||
+        weaponId === "lmg"
+      ) {
+        const rate =
+          weaponId === "smg" || weaponId === "p90"
+            ? 1.34
+            : weaponId === "scarH" || weaponId === "ak74m"
+              ? 0.84
+              : weaponId === "lmg"
+                ? 0.8
+                : 1.0;
+        this.playBuffer("assaultRifleFire", vol * 0.82, rate * jitter, now);
       } else if (weaponId === "vector") {
         this.playBuffer("assaultRifleFire", vol * 0.56, 1.56 * jitter, now);
       } else if (weaponId === "burstRifle" || weaponId === "dmr") {
@@ -160,9 +214,9 @@ class TacticalSoundEngine {
           (weaponId === "dmr" ? 0.74 : 1.0) * jitter,
           now,
         );
-      } else if (weaponId === "sniper") {
-        this.playBuffer("thunder", vol * 0.52, 1.5, now);
-        this.playBuffer("pistolFire", vol * 0.85, 0.48, now);
+      } else if (weaponId === "sniper" || weaponId === "kar98") {
+        this.playBuffer("thunder", vol * 0.54, weaponId === "kar98" ? 1.7 : 1.48, now);
+        this.playBuffer("pistolFire", vol * 0.85, weaponId === "kar98" ? 0.56 : 0.48, now);
       } else if (weaponId === "shotgun" || weaponId === "revolver") {
         this.playBuffer(
           "pistolFire",
@@ -174,7 +228,6 @@ class TacticalSoundEngine {
         this.playBuffer("pistolFire", vol * 0.82, jitter, now);
       }
 
-      // Air-absorption lowpass crack so distant enemy shots sound distinct & realistic
       const noise = ctx.createBufferSource();
       noise.buffer = this.getNoiseBuffer(ctx);
       const filter = ctx.createBiquadFilter();
@@ -186,7 +239,7 @@ class TacticalSoundEngine {
       gain.gain.setValueAtTime(vol * 0.52, now);
       gain.gain.exponentialRampToValueAtTime(
         0.001,
-        now + (weaponId === "sniper" ? 0.36 : weaponId === "dmr" ? 0.25 : 0.19),
+        now + (weaponId === "sniper" || weaponId === "kar98" ? 0.36 : 0.19),
       );
       noise.connect(filter);
       filter.connect(gain);
@@ -205,18 +258,21 @@ class TacticalSoundEngine {
     const jitter = 0.96 + Math.random() * 0.08;
 
     if (weaponId === "assaultRifle") {
-      this.playBuffer("assaultRifleFire", vol * 0.8, jitter, now);
+      this.playBuffer("assaultRifleFire", vol * 0.82, jitter, now);
+    } else if (weaponId === "ak74m") {
+      this.playBuffer("assaultRifleFire", vol * 0.92, 0.84 * jitter, now);
+    } else if (weaponId === "scarH") {
+      this.playBuffer("burstRifleFire", vol * 0.94, 0.78 * jitter, now);
     } else if (weaponId === "lmg") {
-      this.playBuffer("assaultRifleFire", vol * 0.92, 0.82 * jitter, now);
-    } else if (weaponId === "smg") {
-      this.playBuffer("assaultRifleFire", vol * 0.6, 1.38 * jitter, now);
+      this.playBuffer("assaultRifleFire", vol * 0.92, 0.8 * jitter, now);
+    } else if (weaponId === "smg" || weaponId === "p90") {
+      this.playBuffer("assaultRifleFire", vol * 0.65, (weaponId === "p90" ? 1.46 : 1.38) * jitter, now);
     } else if (weaponId === "vector") {
-      // Suppressed rapid thump
       this.playBuffer("assaultRifleFire", vol * 0.45, 1.58 * jitter, now);
     } else if (weaponId === "burstRifle") {
       this.playBuffer("burstRifleFire", vol * 0.78, jitter, now);
     } else if (weaponId === "dmr") {
-      this.playBuffer("burstRifleFire", vol * 0.9, 0.72 * jitter, now);
+      this.playBuffer("burstRifleFire", vol * 0.92, 0.72 * jitter, now);
     } else if (weaponId === "pistol") {
       this.playBuffer("pistolFire", vol * 0.85, jitter, now);
     } else if (weaponId === "revolver") {
@@ -225,13 +281,12 @@ class TacticalSoundEngine {
     } else if (weaponId === "shotgun") {
       this.playBuffer("pistolFire", vol * 0.9, 0.58 * jitter, now);
       this.scheduleClick(ctx, now + 0.25, 1400, 0.05, vol * 0.28);
-    } else if (weaponId === "sniper") {
-      this.playBuffer("thunder", vol * 0.55, 1.6, now);
-      this.playBuffer("pistolFire", vol * 0.85, 0.48, now);
-      this.scheduleClick(ctx, now + 0.42, 2200, 0.045, vol * 0.3);
+    } else if (weaponId === "sniper" || weaponId === "kar98") {
+      this.playBuffer("thunder", vol * 0.58, weaponId === "kar98" ? 1.72 : 1.55, now);
+      this.playBuffer("pistolFire", vol * 0.88, weaponId === "kar98" ? 0.56 : 0.48, now);
+      this.scheduleClick(ctx, now + 0.36, 2200, 0.045, vol * 0.32);
     }
 
-    // Add realistic mechanical chamber punch & supersonic air snap layer
     const noise = ctx.createBufferSource();
     noise.buffer = this.getNoiseBuffer(ctx);
     const filter = ctx.createBiquadFilter();
@@ -239,23 +294,23 @@ class TacticalSoundEngine {
     const osc = ctx.createOscillator();
     const oscGain = ctx.createGain();
 
-    if (weaponId === "sniper" || weaponId === "dmr") {
-      const isDmr = weaponId === "dmr";
+    if (weaponId === "sniper" || weaponId === "kar98" || weaponId === "dmr") {
+      const isHeavyBolt = weaponId === "sniper" || weaponId === "kar98";
       filter.type = "bandpass";
-      filter.frequency.setValueAtTime(isDmr ? 1650 : 1850, now);
-      filter.frequency.exponentialRampToValueAtTime(160, now + (isDmr ? 0.32 : 0.55));
-      gain.gain.setValueAtTime(vol * (isDmr ? 0.75 : 0.95), now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + (isDmr ? 0.36 : 0.6));
+      filter.frequency.setValueAtTime(isHeavyBolt ? 1900 : 1650, now);
+      filter.frequency.exponentialRampToValueAtTime(160, now + (isHeavyBolt ? 0.52 : 0.32));
+      gain.gain.setValueAtTime(vol * (isHeavyBolt ? 0.95 : 0.75), now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + (isHeavyBolt ? 0.56 : 0.36));
 
       osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(isDmr ? 210 : 195, now);
-      osc.frequency.exponentialRampToValueAtTime(40, now + (isDmr ? 0.18 : 0.28));
-      oscGain.gain.setValueAtTime(vol * (isDmr ? 0.55 : 0.75), now);
-      oscGain.gain.exponentialRampToValueAtTime(0.001, now + (isDmr ? 0.2 : 0.3));
+      osc.frequency.setValueAtTime(isHeavyBolt ? 195 : 210, now);
+      osc.frequency.exponentialRampToValueAtTime(38, now + (isHeavyBolt ? 0.28 : 0.18));
+      oscGain.gain.setValueAtTime(vol * (isHeavyBolt ? 0.75 : 0.55), now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + (isHeavyBolt ? 0.3 : 0.2));
       noise.start(now);
-      noise.stop(now + (isDmr ? 0.38 : 0.62));
+      noise.stop(now + (isHeavyBolt ? 0.58 : 0.38));
       osc.start(now);
-      osc.stop(now + (isDmr ? 0.22 : 0.32));
+      osc.stop(now + (isHeavyBolt ? 0.32 : 0.22));
     } else if (weaponId === "shotgun" || weaponId === "revolver") {
       filter.type = "lowpass";
       filter.frequency.setValueAtTime(weaponId === "revolver" ? 2900 : 2600, now);
@@ -273,25 +328,39 @@ class TacticalSoundEngine {
       osc.start(now);
       osc.stop(now + 0.23);
     } else {
-      const dur = weaponId === "smg" || weaponId === "vector" ? 0.075 : weaponId === "lmg" ? 0.16 : 0.14;
+      const dur =
+        weaponId === "smg" || weaponId === "p90" || weaponId === "vector"
+          ? 0.08
+          : weaponId === "scarH" || weaponId === "ak74m" || weaponId === "lmg"
+            ? 0.17
+            : 0.14;
       filter.type = weaponId === "vector" ? "lowpass" : "bandpass";
       filter.frequency.setValueAtTime(
-        weaponId === "vector" ? 1350 : weaponId === "smg" ? 2400 : weaponId === "lmg" ? 1550 : 1850,
+        weaponId === "vector"
+          ? 1350
+          : weaponId === "smg" || weaponId === "p90"
+            ? 2400
+            : weaponId === "scarH" || weaponId === "ak74m"
+              ? 1450
+              : 1850,
         now,
       );
-      filter.frequency.exponentialRampToValueAtTime(320, now + dur);
-      gain.gain.setValueAtTime(vol * (weaponId === "vector" ? 0.26 : 0.42), now);
+      filter.frequency.exponentialRampToValueAtTime(300, now + dur);
+      gain.gain.setValueAtTime(vol * (weaponId === "vector" ? 0.26 : 0.45), now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
 
       osc.type = "triangle";
-      osc.frequency.setValueAtTime(weaponId === "lmg" ? 185 : 220, now);
-      osc.frequency.exponentialRampToValueAtTime(48, now + 0.09);
-      oscGain.gain.setValueAtTime(vol * 0.38, now);
-      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      osc.frequency.setValueAtTime(
+        weaponId === "scarH" || weaponId === "ak74m" ? 170 : 220,
+        now,
+      );
+      osc.frequency.exponentialRampToValueAtTime(44, now + 0.095);
+      oscGain.gain.setValueAtTime(vol * 0.44, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
       noise.start(now);
       noise.stop(now + dur + 0.02);
       osc.start(now);
-      osc.stop(now + 0.11);
+      osc.stop(now + 0.12);
     }
 
     noise.connect(filter);
@@ -300,13 +369,13 @@ class TacticalSoundEngine {
     osc.connect(oscGain);
     oscGain.connect(ctx.destination);
 
-    // Subtle brass casing clink
+    // Metallic brass shell casing clink
     this.scheduleClick(
       ctx,
-      now + 0.16 + Math.random() * 0.08,
-      3600 + Math.random() * 600,
+      now + 0.17 + Math.random() * 0.08,
+      3700 + Math.random() * 650,
       0.025,
-      vol * 0.08,
+      vol * 0.09,
     );
   }
 
@@ -322,10 +391,14 @@ class TacticalSoundEngine {
 
     const pitchMap: Record<WeaponId, [number, number, number]> = {
       assaultRifle: [780, 140, 0.14],
+      ak74m: [680, 115, 0.16],
+      scarH: [590, 95, 0.19],
       smg: [960, 220, 0.08],
+      p90: [1080, 240, 0.08],
       shotgun: [380, 55, 0.28],
       burstRifle: [1150, 260, 0.12],
       sniper: [1480, 75, 0.42],
+      kar98: [1350, 88, 0.34],
       pistol: [680, 130, 0.16],
       dmr: [1220, 110, 0.24],
       lmg: [640, 115, 0.15],
@@ -333,7 +406,7 @@ class TacticalSoundEngine {
       revolver: [520, 82, 0.24],
     };
 
-    const [startF, endF, dur] = pitchMap[weaponId];
+    const [startF, endF, dur] = pitchMap[weaponId] || [780, 140, 0.14];
     osc.type = "sawtooth";
     osc.frequency.setValueAtTime(startF, now);
     osc.frequency.exponentialRampToValueAtTime(endF, now + dur);
@@ -365,11 +438,12 @@ class TacticalSoundEngine {
     noise.buffer = this.getNoiseBuffer(ctx);
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = weaponId === "sniper" || weaponId === "dmr" ? 1200 : 1800;
+    filter.frequency.value =
+      weaponId === "sniper" || weaponId === "kar98" || weaponId === "dmr" ? 1200 : 1800;
 
     const gain = ctx.createGain();
     const dur =
-      weaponId === "sniper"
+      weaponId === "sniper" || weaponId === "kar98"
         ? 0.35
         : weaponId === "shotgun" || weaponId === "revolver"
           ? 0.28
@@ -402,6 +476,114 @@ class TacticalSoundEngine {
     g.connect(ctx.destination);
     osc.start(when);
     osc.stop(when + dur + 0.01);
+  }
+
+  public playSlide() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const vol = this.getVolume(0.42);
+    if (vol <= 0.001) return;
+    const now = ctx.currentTime;
+    const noise = ctx.createBufferSource();
+    noise.buffer = this.getNoiseBuffer(ctx);
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(920, now);
+    filter.frequency.exponentialRampToValueAtTime(240, now + 0.52);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    noise.connect(filter);
+    filter.connect(g);
+    g.connect(ctx.destination);
+    noise.start(now);
+    noise.stop(now + 0.56);
+  }
+
+  public playArmorCrack() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const vol = this.getVolume(0.75);
+    if (vol <= 0.001) return;
+    const now = ctx.currentTime;
+    this.scheduleClick(ctx, now, 3400, 0.06, vol);
+    this.scheduleClick(ctx, now + 0.03, 2100, 0.09, vol * 0.85);
+    this.scheduleClick(ctx, now + 0.065, 4200, 0.07, vol * 0.65);
+  }
+
+  public playArmorPlateInsert() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const vol = this.getVolume(0.55);
+    if (vol <= 0.001) return;
+    const now = ctx.currentTime;
+    this.scheduleClick(ctx, now, 520, 0.08, vol * 0.8);
+    this.scheduleClick(ctx, now + 0.16, 1380, 0.06, vol);
+    this.scheduleClick(ctx, now + 0.26, 2100, 0.05, vol * 0.9);
+  }
+
+  public playMedkitUse() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const vol = this.getVolume(0.5);
+    if (vol <= 0.001) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(420, now);
+    osc.frequency.exponentialRampToValueAtTime(840, now + 0.28);
+    g.gain.setValueAtTime(vol * 0.6, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.34);
+  }
+
+  public playLootPickup(rarity: string = "common") {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const vol = this.getVolume(0.45);
+    if (vol <= 0.001) return;
+    const now = ctx.currentTime;
+    const base =
+      rarity === "legendary"
+        ? 880
+        : rarity === "epic"
+          ? 740
+          : rarity === "rare"
+            ? 620
+            : 520;
+    this.scheduleClick(ctx, now, base, 0.06, vol);
+    this.scheduleClick(ctx, now + 0.06, base * 1.35, 0.09, vol * 0.9);
+  }
+
+  public playScopeZoom() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const vol = this.getVolume(0.32);
+    if (vol <= 0.001) return;
+    this.scheduleClick(ctx, ctx.currentTime, 1950, 0.03, vol);
+  }
+
+  public playOverdriveSurge() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const vol = this.getVolume(0.62);
+    if (vol <= 0.001) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(180, now);
+    osc.frequency.exponentialRampToValueAtTime(760, now + 0.42);
+    g.gain.setValueAtTime(vol * 0.45, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.5);
   }
 
   public playFootstep(sprinting = false) {
@@ -448,7 +630,7 @@ class TacticalSoundEngine {
 
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
-    osc.type = isHeadshot ? "triangle" : "triangle";
+    osc.type = "triangle";
     osc.frequency.setValueAtTime(isHeadshot ? 2350 : 1200, now);
     osc.frequency.exponentialRampToValueAtTime(isHeadshot ? 3200 : 700, now + 0.08);
     g.gain.setValueAtTime(vol * 0.55, now);
@@ -459,7 +641,6 @@ class TacticalSoundEngine {
     osc.stop(now + 0.1);
 
     if (isHeadshot) {
-      // Crisp helmet crack & sub impact punch for headshots
       const crack = ctx.createOscillator();
       const cg = ctx.createGain();
       crack.type = "sine";
@@ -531,7 +712,6 @@ class TacticalSoundEngine {
 
     this.playBuffer("thunder", vol * 0.85, 0.85, now);
 
-    // Deep sub-bass concussion + crackle debris
     const sub = ctx.createOscillator();
     const subGain = ctx.createGain();
     sub.type = "sine";

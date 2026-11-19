@@ -39,6 +39,8 @@ export type PlayerState = {
   pitch: number;
   isCrouching?: boolean;
   isSprinting?: boolean;
+  isSliding?: boolean;
+  lean?: number;
   isMoving?: boolean;
   isGrounded?: boolean;
   moveForward?: number;
@@ -114,6 +116,18 @@ export type HitSparkVFX = {
   z: number;
   color: string;
   isHeadshot: boolean;
+  isArmorBreak?: boolean;
+  createdAt: number;
+};
+
+export type ShellCasingVFX = {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
   createdAt: number;
 };
 
@@ -201,6 +215,22 @@ export type GameStore = {
   dominationProgress: number;
   stormZone: StormZoneState | null;
   lootPickups: LootPickup[];
+  nearbyLoot: LootPickup | null;
+  setNearbyLoot: (loot: LootPickup | null) => void;
+
+  // Signature Tactical Survival & Combat Systems
+  armorPlates: number;
+  medkits: number;
+  overdriveCharge: number; // 0..100
+  overdriveUntil: number;
+  lastLootToast: { label: string; rarity: string; at: number } | null;
+  isMobileHudEditorOpen: boolean;
+  setMobileHudEditorOpen: (open: boolean) => void;
+  addInventoryItem: (type: "armorPlate" | "medkit", count?: number) => void;
+  consumeArmorPlate: () => boolean;
+  consumeMedkit: () => boolean;
+  showLootNotice: (label: string, rarity?: string) => void;
+  chargeOverdrive: (amount: number) => void;
 
   players: Record<string, PlayerState>;
   speakingPeers: Record<string, boolean>;
@@ -223,8 +253,8 @@ export type GameStore = {
   crosshairSpread: number;
   setCrosshairSpread: (spread: number) => void;
 
-  hitMarker: { at: number; isHeadshot: boolean } | null;
-  triggerHitMarker: (isHeadshot: boolean) => void;
+  hitMarker: { at: number; isHeadshot: boolean; isArmorBreak?: boolean } | null;
+  triggerHitMarker: (isHeadshot: boolean, isArmorBreak?: boolean) => void;
 
   damageFlashAt: number;
   triggerDamageFlash: () => void;
@@ -233,6 +263,7 @@ export type GameStore = {
   explosions: ExplosionVFX[];
   muzzleFlashes: MuzzleFlashVFX[];
   hitSparks: HitSparkVFX[];
+  shellCasings: ShellCasingVFX[];
   damagePopups: DamagePopupVFX[];
   hitEntities: Record<string, { at: number; isHeadshot: boolean }>;
   dealtPopups: HudDealtPopup[];
@@ -243,6 +274,7 @@ export type GameStore = {
   addTracer: (tracer: TracerVFX) => void;
   addExplosion: (exp: ExplosionVFX) => void;
   addMuzzleFlash: (flash: MuzzleFlashVFX) => void;
+  addShellCasing: (shell: ShellCasingVFX) => void;
   markEntityHit: (
     targetId: string,
     info: {
@@ -251,6 +283,7 @@ export type GameStore = {
       z: number;
       amount: number;
       isHeadshot: boolean;
+      isArmorBreak?: boolean;
       shooterId?: string;
       attackerX?: number;
       attackerZ?: number;
@@ -268,17 +301,17 @@ const defaultSession: PendingSessionConfig = {
   playMode: "solo",
   roomAction: "public",
   preferredTeam: "auto",
-  mapId: "compound_05",
-  mode: "tdm",
-  botCount: 5,
-  maxPlayers: 10,
+  mapId: "royale_valley",
+  mode: "br",
+  botCount: 9,
+  maxPlayers: 16,
   characterId: "striker",
   skinId: "urban_ops",
   weaponId: "assaultRifle",
   playerName: "Operator-01",
 };
 
-export const useGameStore = create<GameStore>((set) => ({
+export const useGameStore = create<GameStore>((set, get) => ({
   sessionConfig: defaultSession,
   setSessionConfig: (partial) =>
     set((state) => ({
@@ -296,18 +329,58 @@ export const useGameStore = create<GameStore>((set) => ({
   setAvailableRooms: (availableRooms) => set({ availableRooms }),
   setRoomError: (roomError) => set({ roomError }),
 
-  roomId: "SOLO-01",
-  roomName: "Tactical Compound",
-  mapId: "compound_05",
-  mode: "tdm",
-  scoreLimit: 30,
+  roomId: "ROYALE-01",
+  roomName: "Los Verdant Royale",
+  mapId: "royale_valley",
+  mode: "br",
+  scoreLimit: 1,
   matchState: "waiting",
-  timeRemaining: 240,
+  timeRemaining: 360,
   teamScores: { red: 0, blue: 0 },
   dominationOwner: "none",
   dominationProgress: 0,
   stormZone: null,
   lootPickups: [],
+  nearbyLoot: null,
+  setNearbyLoot: (nearbyLoot) => set({ nearbyLoot }),
+
+  armorPlates: 2,
+  medkits: 1,
+  overdriveCharge: 0,
+  overdriveUntil: 0,
+  lastLootToast: null,
+  isMobileHudEditorOpen: false,
+  setMobileHudEditorOpen: (isMobileHudEditorOpen) => set({ isMobileHudEditorOpen }),
+  addInventoryItem: (type, count = 1) =>
+    set((state) =>
+      type === "armorPlate"
+        ? { armorPlates: Math.min(6, state.armorPlates + count) }
+        : { medkits: Math.min(4, state.medkits + count) },
+    ),
+  consumeArmorPlate: () => {
+    if (get().armorPlates <= 0) return false;
+    set((state) => ({ armorPlates: Math.max(0, state.armorPlates - 1) }));
+    return true;
+  },
+  consumeMedkit: () => {
+    if (get().medkits <= 0) return false;
+    set((state) => ({ medkits: Math.max(0, state.medkits - 1) }));
+    return true;
+  },
+  showLootNotice: (label, rarity = "rare") =>
+    set({ lastLootToast: { label, rarity, at: Date.now() } }),
+  chargeOverdrive: (amount) =>
+    set((state) => {
+      const next = Math.min(100, state.overdriveCharge + amount);
+      if (next >= 100) {
+        return {
+          overdriveCharge: 0,
+          overdriveUntil: Date.now() + 9000,
+          streakBanner: { label: "OVERDRIVE SURGE ACTIVE", at: Date.now() },
+        };
+      }
+      return { overdriveCharge: next };
+    }),
 
   players: {},
   speakingPeers: {},
@@ -360,8 +433,8 @@ export const useGameStore = create<GameStore>((set) => ({
   setCrosshairSpread: (spread) => set({ crosshairSpread: spread }),
 
   hitMarker: null,
-  triggerHitMarker: (isHeadshot) =>
-    set({ hitMarker: { at: Date.now(), isHeadshot } }),
+  triggerHitMarker: (isHeadshot, isArmorBreak) =>
+    set({ hitMarker: { at: Date.now(), isHeadshot, isArmorBreak } }),
 
   damageFlashAt: 0,
   triggerDamageFlash: () => set({ damageFlashAt: Date.now() }),
@@ -370,6 +443,7 @@ export const useGameStore = create<GameStore>((set) => ({
   explosions: [],
   muzzleFlashes: [],
   hitSparks: [],
+  shellCasings: [],
   damagePopups: [],
   hitEntities: {},
   dealtPopups: [],
@@ -379,7 +453,7 @@ export const useGameStore = create<GameStore>((set) => ({
   lastStreakKillAt: 0,
   addTracer: (tracer) =>
     set((state) => ({
-      tracers: [...state.tracers.slice(-24), tracer],
+      tracers: [...state.tracers.slice(-28), tracer],
     })),
   addExplosion: (exp) =>
     set((state) => ({
@@ -388,6 +462,10 @@ export const useGameStore = create<GameStore>((set) => ({
   addMuzzleFlash: (flash) =>
     set((state) => ({
       muzzleFlashes: [...state.muzzleFlashes.slice(-16), flash],
+    })),
+  addShellCasing: (shell) =>
+    set((state) => ({
+      shellCasings: [...state.shellCasings.slice(-20), shell],
     })),
   markEntityHit: (targetId, info) =>
     set((state) => {
@@ -402,14 +480,19 @@ export const useGameStore = create<GameStore>((set) => ({
           [targetId]: { at: now, isHeadshot: info.isHeadshot },
         },
         hitSparks: [
-          ...state.hitSparks.slice(-18),
+          ...state.hitSparks.slice(-20),
           {
             id: `spark_${id}`,
             x: info.x,
             y: info.y,
             z: info.z,
-            color: info.isHeadshot ? "#fbbf24" : "#ef4444",
+            color: info.isArmorBreak
+              ? "#22d3ee"
+              : info.isHeadshot
+                ? "#fbbf24"
+                : "#ef4444",
             isHeadshot: info.isHeadshot,
+            isArmorBreak: info.isArmorBreak,
             createdAt: now,
           },
         ],
@@ -458,17 +541,24 @@ export const useGameStore = create<GameStore>((set) => ({
   registerLocalKill: (isHeadshot) =>
     set((state) => {
       const now = Date.now();
-      const withinChain = now - state.lastStreakKillAt < 7000;
+      const withinChain = now - state.lastStreakKillAt < 8000;
       const nextStreak = withinChain ? state.streakCount + 1 : 1;
+      const nextCharge = state.overdriveCharge + (isHeadshot ? 45 : 34);
+      const triggerOverdrive = nextCharge >= 100;
+
       let label = "";
-      if (nextStreak >= 5) label = "GODLIKE RAMPAGE";
+      if (triggerOverdrive) label = "OVERDRIVE SURGE ACTIVE";
+      else if (nextStreak >= 5) label = "GODLIKE RAMPAGE";
       else if (nextStreak === 4) label = "QUADRA KILL";
       else if (nextStreak === 3) label = "TRIPLE KILL";
       else if (nextStreak === 2) label = "DOUBLE KILL";
       else if (isHeadshot) label = "HEADSHOT ELIMINATION";
+
       return {
         streakCount: nextStreak,
         lastStreakKillAt: now,
+        overdriveCharge: triggerOverdrive ? 0 : nextCharge,
+        overdriveUntil: triggerOverdrive ? now + 9000 : state.overdriveUntil,
         streakBanner: label ? { label, at: now } : state.streakBanner,
       };
     }),
@@ -476,10 +566,11 @@ export const useGameStore = create<GameStore>((set) => ({
     set((state) => {
       const now = Date.now();
       return {
-        tracers: state.tracers.filter((t) => now - t.createdAt < 220),
+        tracers: state.tracers.filter((t) => now - t.createdAt < 230),
         explosions: state.explosions.filter((e) => now - e.createdAt < 750),
         muzzleFlashes: state.muzzleFlashes.filter((m) => now - m.createdAt < 95),
-        hitSparks: state.hitSparks.filter((s) => now - s.createdAt < 420),
+        hitSparks: state.hitSparks.filter((s) => now - s.createdAt < 450),
+        shellCasings: state.shellCasings.filter((c) => now - c.createdAt < 900),
         damagePopups: state.damagePopups.filter((d) => now - d.createdAt < 780),
         dealtPopups: state.dealtPopups.filter((d) => now - d.createdAt < 950),
         takenPopups: state.takenPopups.filter((t) => now - t.createdAt < 950),
@@ -495,6 +586,7 @@ export const useGameStore = create<GameStore>((set) => ({
       explosions: [],
       muzzleFlashes: [],
       hitSparks: [],
+      shellCasings: [],
       damagePopups: [],
       hitEntities: {},
       dealtPopups: [],
@@ -510,6 +602,12 @@ export const useGameStore = create<GameStore>((set) => ({
       dominationProgress: 0,
       stormZone: null,
       lootPickups: [],
+      nearbyLoot: null,
+      armorPlates: 2,
+      medkits: 1,
+      overdriveCharge: 0,
+      overdriveUntil: 0,
+      lastLootToast: null,
       roomError: null,
     }),
 }));

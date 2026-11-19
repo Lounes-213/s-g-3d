@@ -415,6 +415,238 @@ function PropRenderer({
     );
   }
 
+  if (prop.kind === "watchtower") {
+    const h = prop.height || 7.2;
+    return (
+      <group position={[prop.x, prop.y, prop.z]} rotation={[0, rotY, 0]}>
+        {[
+          [-1.55, -1.55],
+          [1.55, -1.55],
+          [-1.55, 1.55],
+          [1.55, 1.55],
+        ].map(([px, pz], i) => (
+          <mesh key={i} castShadow receiveShadow position={[px, h / 2, pz]}>
+            <boxGeometry args={[0.24, h, 0.24]} />
+            <meshStandardMaterial color="#475569" roughness={0.62} metalness={0.5} />
+          </mesh>
+        ))}
+        {/* Cross bracing */}
+        <mesh position={[0, h * 0.35, -1.55]} rotation={[0, 0, 0.65]}>
+          <boxGeometry args={[3.8, 0.12, 0.12]} />
+          <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.55} />
+        </mesh>
+        <mesh position={[0, h * 0.35, 1.55]} rotation={[0, 0, -0.65]}>
+          <boxGeometry args={[3.8, 0.12, 0.12]} />
+          <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.55} />
+        </mesh>
+        {/* Observation Deck */}
+        <mesh castShadow receiveShadow position={[0, h - 1.6, 0]}>
+          <boxGeometry args={[3.8, 0.28, 3.8]} />
+          <meshStandardMaterial map={woodTex} color="#8f623c" roughness={0.82} />
+        </mesh>
+        {/* Parapet Half-Walls */}
+        <mesh castShadow position={[0, h - 0.9, -1.8]}>
+          <boxGeometry args={[3.8, 1.1, 0.18]} />
+          <meshStandardMaterial map={woodTex} color="#6b4b32" roughness={0.82} />
+        </mesh>
+        <mesh castShadow position={[0, h - 0.9, 1.8]}>
+          <boxGeometry args={[3.8, 1.1, 0.18]} />
+          <meshStandardMaterial map={woodTex} color="#6b4b32" roughness={0.82} />
+        </mesh>
+        <mesh castShadow position={[-1.8, h - 0.9, 0]}>
+          <boxGeometry args={[0.18, 1.1, 3.6]} />
+          <meshStandardMaterial map={woodTex} color="#6b4b32" roughness={0.82} />
+        </mesh>
+        <mesh castShadow position={[1.8, h - 0.9, 0]}>
+          <boxGeometry args={[0.18, 1.1, 3.6]} />
+          <meshStandardMaterial map={woodTex} color="#6b4b32" roughness={0.82} />
+        </mesh>
+        {/* Corrugated Roof */}
+        <mesh castShadow receiveShadow position={[0, h + 0.55, 0]} rotation={[0, Math.PI / 4, 0]}>
+          <coneGeometry args={[3.2, 1.35, 4]} />
+          <meshStandardMaterial map={roofTex} bumpMap={roofBump} bumpScale={0.06} color="#52525b" roughness={0.75} />
+        </mesh>
+        {/* Red aviation warning beacon */}
+        <mesh position={[0, h + 1.35, 0]}>
+          <sphereGeometry args={[0.14, 8, 8]} />
+          <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={2.2} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (prop.kind === "gas_canopy") {
+    const w = prop.width || 16;
+    const d = prop.depth || 9;
+    const h = prop.height || 5.2;
+    return (
+      <group position={[prop.x, prop.y, prop.z]} rotation={[0, rotY, 0]}>
+        {/* Main Fuel Station Canopy Slab */}
+        <mesh castShadow receiveShadow position={[0, h, 0]}>
+          <boxGeometry args={[w, 0.72, d]} />
+          <meshStandardMaterial color="#e2e8f0" roughness={0.5} metalness={0.35} />
+        </mesh>
+        {/* Glowing Amber & Cyan Fascia Stripe */}
+        <mesh position={[0, h, d / 2 + 0.04]}>
+          <boxGeometry args={[w + 0.1, 0.34, 0.08]} />
+          <meshStandardMaterial color="#f59e0b" emissive="#f59e0b" emissiveIntensity={0.85} />
+        </mesh>
+        <mesh position={[0, h, -d / 2 - 0.04]}>
+          <boxGeometry args={[w + 0.1, 0.34, 0.08]} />
+          <meshStandardMaterial color="#f59e0b" emissive="#f59e0b" emissiveIntensity={0.85} />
+        </mesh>
+        {/* 4 Support Columns */}
+        {[
+          [-w * 0.34, -d * 0.28],
+          [w * 0.34, -d * 0.28],
+          [-w * 0.34, d * 0.28],
+          [w * 0.34, d * 0.28],
+        ].map(([cx, cz], idx) => (
+          <mesh key={idx} castShadow receiveShadow position={[cx, h / 2, cz]}>
+            <boxGeometry args={[0.55, h, 0.55]} />
+            <meshStandardMaterial color="#334155" roughness={0.5} metalness={0.5} />
+          </mesh>
+        ))}
+        {/* Fuel Pump Islands */}
+        {[-w * 0.22, w * 0.22].map((px, idx) => (
+          <group key={idx} position={[px, 0, 0]}>
+            <mesh castShadow receiveShadow position={[0, 0.14, 0]}>
+              <boxGeometry args={[1.6, 0.28, 3.6]} />
+              <meshStandardMaterial color="#94a3b8" roughness={0.86} />
+            </mesh>
+            <mesh castShadow position={[0, 1.05, -0.8]}>
+              <boxGeometry args={[0.72, 1.55, 0.52]} />
+              <meshStandardMaterial color="#dc2626" roughness={0.45} metalness={0.35} />
+            </mesh>
+            <mesh position={[0, 1.32, -0.52]}>
+              <boxGeometry args={[0.52, 0.36, 0.04]} />
+              <meshStandardMaterial color="#38bdf8" emissive="#0284c7" emissiveIntensity={0.9} />
+            </mesh>
+            <mesh castShadow position={[0, 1.05, 0.8]}>
+              <boxGeometry args={[0.72, 1.55, 0.52]} />
+              <meshStandardMaterial color="#f59e0b" roughness={0.45} metalness={0.35} />
+            </mesh>
+          </group>
+        ))}
+      </group>
+    );
+  }
+
+  if (prop.kind === "palm_tree") {
+    return (
+      <group position={[prop.x, prop.y, prop.z]} rotation={[0, rotY, 0]}>
+        {/* Curved multi-segment palm trunk */}
+        <mesh castShadow position={[0, 1.5, 0]} rotation={[0.04, 0, 0.04]}>
+          <cylinderGeometry args={[0.24, 0.36, 3.0, 7]} />
+          <meshStandardMaterial color="#78563a" roughness={0.92} />
+        </mesh>
+        <mesh castShadow position={[0.14, 4.3, 0.1]} rotation={[0.07, 0, -0.05]}>
+          <cylinderGeometry args={[0.18, 0.24, 3.0, 7]} />
+          <meshStandardMaterial color="#876243" roughness={0.92} />
+        </mesh>
+        <mesh castShadow position={[0.22, 6.7, 0.16]} rotation={[0.05, 0, -0.02]}>
+          <cylinderGeometry args={[0.14, 0.18, 2.2, 7]} />
+          <meshStandardMaterial color="#946c4a" roughness={0.92} />
+        </mesh>
+        {/* Tropical palm fronds */}
+        <group position={[0.26, 7.6, 0.18]}>
+          {[0, 1, 2, 3, 4, 5, 6].map((idx) => {
+            const ang = (idx / 7) * Math.PI * 2;
+            return (
+              <group key={idx} rotation={[0, ang, 0]}>
+                <mesh castShadow position={[1.45, 0.15, 0]} rotation={[0, 0, -0.35]}>
+                  <boxGeometry args={[2.8, 0.09, 0.55]} />
+                  <meshStandardMaterial color={idx % 2 === 0 ? "#2e7d32" : "#388e3c"} roughness={0.86} />
+                </mesh>
+                <mesh castShadow position={[2.8, -0.45, 0]} rotation={[0, 0, -0.78]}>
+                  <boxGeometry args={[1.35, 0.07, 0.36]} />
+                  <meshStandardMaterial color="#43a047" roughness={0.86} />
+                </mesh>
+              </group>
+            );
+          })}
+        </group>
+      </group>
+    );
+  }
+
+  if (prop.kind === "boulder_cluster") {
+    return (
+      <group position={[prop.x, prop.y, prop.z]} rotation={[0, rotY, 0]}>
+        <mesh castShadow receiveShadow position={[0, 1.05, 0]} scale={[1.65, 1.1, 1.35]}>
+          <dodecahedronGeometry args={[1.25, 0]} />
+          <meshStandardMaterial color="#6b7280" roughness={0.92} />
+        </mesh>
+        <mesh castShadow receiveShadow position={[1.35, 0.65, 0.65]} scale={[1.1, 0.85, 1.0]}>
+          <dodecahedronGeometry args={[0.95, 0]} />
+          <meshStandardMaterial color="#7b8494" roughness={0.9} />
+        </mesh>
+        <mesh castShadow receiveShadow position={[-1.1, 0.52, -0.75]} scale={[0.95, 0.72, 1.15]}>
+          <dodecahedronGeometry args={[0.85, 0]} />
+          <meshStandardMaterial color="#5b6370" roughness={0.92} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (prop.kind === "billboard") {
+    return (
+      <group position={[prop.x, prop.y, prop.z]} rotation={[0, rotY, 0]}>
+        {/* Steel twin pillars */}
+        <mesh castShadow position={[-3.2, 3.6, 0]}>
+          <cylinderGeometry args={[0.24, 0.3, 7.2, 8]} />
+          <meshStandardMaterial color="#334155" metalness={0.65} roughness={0.38} />
+        </mesh>
+        <mesh castShadow position={[3.2, 3.6, 0]}>
+          <cylinderGeometry args={[0.24, 0.3, 7.2, 8]} />
+          <meshStandardMaterial color="#334155" metalness={0.65} roughness={0.38} />
+        </mesh>
+        {/* Main Signboard Frame */}
+        <mesh castShadow receiveShadow position={[0, 6.2, 0]}>
+          <boxGeometry args={[9.4, 3.5, 0.42]} />
+          <meshStandardMaterial color="#0f172a" roughness={0.45} metalness={0.5} />
+        </mesh>
+        {/* Glowing Highway Ad Graphic */}
+        <mesh position={[0, 6.2, 0.23]}>
+          <boxGeometry args={[8.9, 3.0, 0.04]} />
+          <meshStandardMaterial color="#0ea5e9" emissive="#0284c7" emissiveIntensity={0.75} roughness={0.35} />
+        </mesh>
+        <mesh position={[0, 6.2, -0.23]}>
+          <boxGeometry args={[8.9, 3.0, 0.04]} />
+          <meshStandardMaterial color="#f59e0b" emissive="#d97706" emissiveIntensity={0.65} roughness={0.35} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (prop.kind === "heli_pad") {
+    return (
+      <group position={[prop.x, prop.y + 0.08, prop.z]} rotation={[0, rotY, 0]}>
+        <mesh receiveShadow>
+          <cylinderGeometry args={[6.2, 6.5, 0.16, 24]} />
+          <meshStandardMaterial color="#334155" roughness={0.85} />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.1, 0]}>
+          <ringGeometry args={[4.6, 5.15, 32]} />
+          <meshStandardMaterial color="#facc15" emissive="#ca8a04" emissiveIntensity={0.35} roughness={0.6} />
+        </mesh>
+        {/* H Letter markings */}
+        <mesh position={[-1.4, 0.11, 0]}>
+          <boxGeometry args={[0.55, 0.03, 3.6]} />
+          <meshStandardMaterial color="#facc15" roughness={0.6} />
+        </mesh>
+        <mesh position={[1.4, 0.11, 0]}>
+          <boxGeometry args={[0.55, 0.03, 3.6]} />
+          <meshStandardMaterial color="#facc15" roughness={0.6} />
+        </mesh>
+        <mesh position={[0, 0.11, 0]}>
+          <boxGeometry args={[2.8, 0.03, 0.55]} />
+          <meshStandardMaterial color="#facc15" roughness={0.6} />
+        </mesh>
+      </group>
+    );
+  }
+
   return null;
 }
 
@@ -498,13 +730,22 @@ function DynamicPhysicsProps({
   );
 }
 
+const RARITY_COLORS: Record<NonNullable<LootPickup["rarity"]>, string> = {
+  common: "#94a3b8",
+  rare: "#06b6d4",
+  epic: "#a855f7",
+  legendary: "#f59e0b",
+};
+
 function LootPickupMesh({ item }: { item: LootPickup }) {
   const ref = useRef<THREE.Group>(null);
 
   useFrame((state) => {
     if (ref.current) {
-      ref.current.rotation.y += 0.03;
-      ref.current.position.y = item.y + 0.45 + Math.sin(state.clock.elapsedTime * 3 + item.x) * 0.14;
+      if (!item.isAirdrop && !item.isDeathBox) {
+        ref.current.rotation.y += 0.025;
+        ref.current.position.y = item.y + 0.42 + Math.sin(state.clock.elapsedTime * 3.2 + item.x) * 0.11;
+      }
     }
   });
 
@@ -513,27 +754,109 @@ function LootPickupMesh({ item }: { item: LootPickup }) {
   const colorMap: Record<LootPickup["kind"], string> = {
     medkit: "#22c55e",
     armor: "#38bdf8",
-    ammo: "#f59e0b",
+    ammo: "#eab308",
     weapon: "#a855f7",
+    scope: "#06b6d4",
+    attachment: "#f97316",
+    airdrop: "#ef4444",
   };
-  const col = colorMap[item.kind];
+  const col = item.rarity ? RARITY_COLORS[item.rarity] : colorMap[item.kind];
+  const beamHeight = item.isAirdrop ? 42 : item.rarity === "legendary" ? 8.5 : item.rarity === "epic" ? 5.2 : 2.8;
+
+  if (item.isAirdrop) {
+    return (
+      <group position={[item.x, item.y, item.z]}>
+        {/* Heavy Military Supply Drop Crate */}
+        <mesh castShadow receiveShadow position={[0, 0.72, 0]}>
+          <boxGeometry args={[1.45, 1.35, 1.45]} />
+          <meshStandardMaterial color="#991b1b" roughness={0.48} metalness={0.42} />
+        </mesh>
+        <mesh position={[0, 1.42, 0]}>
+          <boxGeometry args={[1.52, 0.14, 1.52]} />
+          <meshStandardMaterial color="#f59e0b" roughness={0.4} metalness={0.5} />
+        </mesh>
+        <mesh position={[0, 0.72, 0]}>
+          <boxGeometry args={[1.49, 0.22, 1.49]} />
+          <meshStandardMaterial color="#1e293b" roughness={0.5} metalness={0.6} />
+        </mesh>
+        {/* High-visibility red/gold airdrop flare column */}
+        <mesh position={[0, beamHeight / 2 + 1.2, 0]}>
+          <cylinderGeometry args={[0.14, 0.42, beamHeight, 10, 1, true]} />
+          <meshBasicMaterial color="#ef4444" transparent opacity={0.34} side={THREE.DoubleSide} depthWrite={false} />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
+          <ringGeometry args={[1.25, 1.55, 24]} />
+          <meshBasicMaterial color="#f59e0b" transparent opacity={0.85} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (item.isDeathBox) {
+    return (
+      <group position={[item.x, item.y, item.z]}>
+        {/* Eliminated Enemy Tactical Death Box */}
+        <mesh castShadow receiveShadow position={[0, 0.32, 0]}>
+          <boxGeometry args={[0.92, 0.56, 0.62]} />
+          <meshStandardMaterial color="#1e293b" roughness={0.45} metalness={0.55} />
+        </mesh>
+        <mesh position={[0, 0.61, 0]}>
+          <boxGeometry args={[0.95, 0.08, 0.65]} />
+          <meshStandardMaterial color="#f59e0b" emissive="#f59e0b" emissiveIntensity={0.7} roughness={0.35} />
+        </mesh>
+        <mesh position={[0, 2.8, 0]}>
+          <cylinderGeometry args={[0.04, 0.18, 5.2, 8, 1, true]} />
+          <meshBasicMaterial color="#f59e0b" transparent opacity={0.28} side={THREE.DoubleSide} depthWrite={false} />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]}>
+          <ringGeometry args={[0.68, 0.86, 18]} />
+          <meshBasicMaterial color="#f59e0b" transparent opacity={0.78} />
+        </mesh>
+      </group>
+    );
+  }
 
   return (
-    <group ref={ref} position={[item.x, item.y + 0.45, item.z]}>
-      <mesh castShadow>
-        <boxGeometry args={[0.68, 0.48, 0.68]} />
-        <meshStandardMaterial
-          color={col}
-          emissive={col}
-          emissiveIntensity={0.85}
-          roughness={0.35}
-          metalness={0.4}
-        />
+    <group position={[item.x, item.y, item.z]}>
+      {/* Vertical rarity loot pillar */}
+      <mesh position={[0, beamHeight / 2 + 0.1, 0]}>
+        <cylinderGeometry args={[0.03, 0.14, beamHeight, 8, 1, true]} />
+        <meshBasicMaterial color={col} transparent opacity={0.24} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.38, 0]}>
-        <ringGeometry args={[0.55, 0.72, 16]} />
-        <meshBasicMaterial color={col} transparent opacity={0.7} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]}>
+        <ringGeometry args={[0.52, 0.68, 18]} />
+        <meshBasicMaterial color={col} transparent opacity={0.72} />
       </mesh>
+      <group ref={ref} position={[0, 0.42, 0]}>
+        {item.kind === "weapon" ? (
+          <group>
+            <mesh castShadow>
+              <boxGeometry args={[0.96, 0.22, 0.24]} />
+              <meshStandardMaterial color="#1f2937" roughness={0.38} metalness={0.62} />
+            </mesh>
+            <mesh position={[0, 0.14, 0]}>
+              <boxGeometry args={[0.42, 0.08, 0.12]} />
+              <meshStandardMaterial color={col} emissive={col} emissiveIntensity={0.9} />
+            </mesh>
+          </group>
+        ) : item.kind === "scope" || item.kind === "attachment" ? (
+          <mesh castShadow rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.14, 0.16, 0.56, 10]} />
+            <meshStandardMaterial color={col} emissive={col} emissiveIntensity={0.65} roughness={0.32} metalness={0.6} />
+          </mesh>
+        ) : (
+          <mesh castShadow>
+            <boxGeometry args={[0.64, 0.44, 0.64]} />
+            <meshStandardMaterial
+              color={col}
+              emissive={col}
+              emissiveIntensity={0.65}
+              roughness={0.35}
+              metalness={0.4}
+            />
+          </mesh>
+        )}
+      </group>
     </group>
   );
 }
@@ -687,7 +1010,8 @@ const ArenaGeometry = () => {
   const stormZone = useGameStore((state) => state.stormZone);
   const lootPickups = useGameStore((state) => state.lootPickups);
 
-  const currentMap = MAPS[mapId] || MAPS.veridian_04;
+  const currentMap = MAPS[mapId] || MAPS.royale_valley;
+  const floorScale = Math.max(1, currentMap.floor.width / 100);
 
   const procTextures = useMemo(() => {
     const cloneWithRepeat = (
@@ -714,19 +1038,19 @@ const ArenaGeometry = () => {
       brick: cloneWithRepeat("brick_wall", 2, 1),
       plaster: cloneWithRepeat("plaster_wall", 2, 1),
       wood: cloneWithRepeat("wood_plank", 2, 2),
-      asphalt: cloneWithRepeat("asphalt", 18, 18),
+      asphalt: cloneWithRepeat("asphalt", Math.round(18 * floorScale), Math.round(18 * floorScale)),
       roadBox: cloneWithRepeat("asphalt", 4, 4),
-      grass: cloneWithRepeat("grass_terrain", 20, 20),
-      sand: cloneWithRepeat("stone_sand", 14, 14),
-      concreteFloor: cloneWithRepeat("concrete", 24, 24),
+      grass: cloneWithRepeat("grass_terrain", Math.round(22 * floorScale), Math.round(22 * floorScale)),
+      sand: cloneWithRepeat("stone_sand", Math.round(14 * floorScale), Math.round(14 * floorScale)),
+      concreteFloor: cloneWithRepeat("concrete", Math.round(24 * floorScale), Math.round(24 * floorScale)),
       concrete: cloneWithRepeat("concrete", 3, 2),
-      metalFloor: cloneWithRepeat("metal_panel", 18, 18),
+      metalFloor: cloneWithRepeat("metal_panel", Math.round(18 * floorScale), Math.round(18 * floorScale)),
       metal: cloneWithRepeat("metal_panel", 2, 2),
       roof: cloneWithRepeat("roof_shingle", 4, 3),
       brickBump: cloneBumpWithRepeat("brick_wall", 2, 1),
       roofBump: cloneBumpWithRepeat("roof_shingle", 4, 3),
     };
-  }, []);
+  }, [floorScale]);
 
   // Bright, readable ground surface textures (never dark numbered prototype grids)
   const floorTex = useMemo(() => {
@@ -817,7 +1141,7 @@ const ArenaGeometry = () => {
     <group>
       {/* Extended Exterior Horizon Terrain Skirt & Instanced Perimeter Scenery */}
       <mesh position={[0, -0.75, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[480, 480]} />
+        <planeGeometry args={[760, 760]} />
         <meshStandardMaterial
           color={
             currentMap.id === "outpost_02"

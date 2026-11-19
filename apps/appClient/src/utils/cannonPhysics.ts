@@ -215,15 +215,42 @@ export class ArenaPhysicsWorld {
         body.addShape(new CANNON.Sphere(1.15));
         this.world.addBody(body);
         this.staticBodies.push(body);
-      } else if (prop.kind === "tree_pine" || prop.kind === "tree_oak") {
+      } else if (prop.kind === "tree_pine" || prop.kind === "tree_oak" || prop.kind === "palm_tree") {
         const body = new CANNON.Body({
           mass: 0,
           material: this.worldMaterial,
-          position: new CANNON.Vec3(prop.x, 1.8, prop.z),
+          position: new CANNON.Vec3(prop.x, 2.2, prop.z),
         });
-        body.addShape(new CANNON.Cylinder(0.45, 0.5, 3.6, 8));
+        body.addShape(new CANNON.Cylinder(0.42, 0.48, 4.4, 8));
         this.world.addBody(body);
         this.staticBodies.push(body);
+      } else if (prop.kind === "boulder_cluster") {
+        const body = new CANNON.Body({
+          mass: 0,
+          material: this.worldMaterial,
+          position: new CANNON.Vec3(prop.x, prop.y + 1.0, prop.z),
+        });
+        body.addShape(new CANNON.Sphere(1.55));
+        this.world.addBody(body);
+        this.staticBodies.push(body);
+      } else if (prop.kind === "watchtower") {
+        const h = prop.height || 7.2;
+        const corners: Array<[number, number]> = [
+          [-1.55, -1.55],
+          [1.55, -1.55],
+          [-1.55, 1.55],
+          [1.55, 1.55],
+        ];
+        for (const [cx, cz] of corners) {
+          const body = new CANNON.Body({
+            mass: 0,
+            material: this.worldMaterial,
+            position: new CANNON.Vec3(prop.x + cx, prop.y + h / 2, prop.z + cz),
+          });
+          body.addShape(new CANNON.Box(new CANNON.Vec3(0.2, h / 2, 0.2)));
+          this.world.addBody(body);
+          this.staticBodies.push(body);
+        }
       }
     }
 

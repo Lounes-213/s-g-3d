@@ -6,20 +6,28 @@ import {
   CHARACTER_SKINS,
   type CharacterId,
   type SkinId,
+  type WeaponAttachments,
   type WeaponId,
 } from "@block-shooter/shared";
 import { SCULPTED_GEOS } from "./sculptedGeometries";
 import { WeaponModel3D } from "./WeaponModels3D";
+import {
+  getProceduralBumpMap,
+  getProceduralTexture,
+} from "../../utils/proceduralTextures";
 
 interface CharacterModel3DProps {
   characterId: CharacterId;
   skinId?: SkinId;
   team: "red" | "blue" | "none";
   weaponId: WeaponId;
+  weaponAttachments?: Partial<WeaponAttachments>;
   pitch: number;
   isMoving?: boolean;
   isSprinting?: boolean;
   isCrouching?: boolean;
+  isSliding?: boolean;
+  lean?: number;
   isReloading?: boolean;
   isGrounded?: boolean;
   isAiming?: boolean;
@@ -34,18 +42,24 @@ interface CharacterModel3DProps {
 }
 
 /**
- * Unified, lightweight articulated 3D operator rig shared identically across all classes & skins.
- * Height: ~1.98m (y = -1.0 boots to y = +0.92 helmet crown) — zero glTF cloning/mixer overhead.
+ * High-detail realistic articulated 3D tactical operator rig:
+ * - Procedural ripstop fabric & kevlar weave PBR maps
+ * - Anatomical neck, balaclava mask, Comtac headset, NVG mount, plate carrier w/ mag pouches & radio
+ * - Tactical belt, drop-leg holster, sculpted knee/elbow pads
+ * - Full locomotion: Idle breathing, Walk, Sprint, Strafe, Crouch, Kinetic Slide, Q/E Tactical Lean, Reload & Recoil
  */
 export function CharacterModel3D({
   characterId,
   skinId,
   team,
   weaponId,
+  weaponAttachments,
   pitch,
   isMoving = false,
   isSprinting = false,
   isCrouching = false,
+  isSliding = false,
+  lean = 0,
   isReloading = false,
   isGrounded = true,
   isAiming = false,
@@ -69,7 +83,6 @@ export function CharacterModel3D({
         ? "#3b82f6"
         : skin.accentColor;
 
-  // Articulated joint hierarchy refs
   const rootRef = useRef<THREE.Group>(null);
   const pelvisRef = useRef<THREE.Group>(null);
   const torsoRef = useRef<THREE.Group>(null);
@@ -89,45 +102,75 @@ export function CharacterModel3D({
   const shieldRef = useRef<THREE.Mesh>(null);
   const beaconMatRef = useRef<THREE.MeshStandardMaterial>(null);
 
-  // Materials for unified operator + hit emissive feedback
   const mats = useMemo(() => {
+    const weaveColor = getProceduralTexture("tactical_weave");
+    const weaveBump = getProceduralBumpMap("tactical_weave");
+
     const uniformPrimary = new THREE.MeshStandardMaterial({
       color: skin.uniformPrimary,
-      roughness: 0.72,
-      metalness: 0.14,
+      map: weaveColor,
+      bumpMap: weaveBump,
+      bumpScale: 0.015,
+      roughness: 0.78,
+      metalness: 0.08,
     });
     const uniformSecondary = new THREE.MeshStandardMaterial({
       color: skin.uniformSecondary,
-      roughness: 0.68,
-      metalness: 0.18,
+      map: weaveColor,
+      bumpMap: weaveBump,
+      bumpScale: 0.012,
+      roughness: 0.72,
+      metalness: 0.14,
     });
     const armor = new THREE.MeshStandardMaterial({
-      color: team === "none" ? skin.armorColor : team === "red" ? "#451a1a" : "#172554",
-      roughness: 0.45,
-      metalness: 0.52,
+      color: team === "none" ? skin.armorColor : team === "red" ? "#4a1b1b" : "#182854",
+      bumpMap: weaveBump,
+      bumpScale: 0.018,
+      roughness: 0.44,
+      metalness: 0.46,
+    });
+    const gearDark = new THREE.MeshStandardMaterial({
+      color: "#181a20",
+      roughness: 0.62,
+      metalness: 0.25,
+    });
+    const pouchMat = new THREE.MeshStandardMaterial({
+      color: skin.uniformSecondary,
+      roughness: 0.82,
+      metalness: 0.08,
     });
     const skinTone = new THREE.MeshStandardMaterial({
-      color: "#d4a373",
-      roughness: 0.75,
+      color: "#cfa078",
+      roughness: 0.72,
       metalness: 0.02,
+    });
+    const balaclava = new THREE.MeshStandardMaterial({
+      color: "#1e222a",
+      bumpMap: weaveBump,
+      bumpScale: 0.01,
+      roughness: 0.86,
+      metalness: 0.05,
     });
     const boots = new THREE.MeshStandardMaterial({
       color: skin.bootColor,
-      roughness: 0.8,
-      metalness: 0.12,
+      roughness: 0.78,
+      metalness: 0.14,
     });
     const visor = new THREE.MeshStandardMaterial({
       color: cfg.visorColor,
       emissive: cfg.visorColor,
-      emissiveIntensity: 1.5,
-      roughness: 0.16,
-      metalness: 0.85,
+      emissiveIntensity: 1.35,
+      roughness: 0.14,
+      metalness: 0.88,
     });
     return {
       uniformPrimary,
       uniformSecondary,
       armor,
+      gearDark,
+      pouchMat,
       skinTone,
+      balaclava,
       boots,
       visor,
     };
@@ -158,12 +201,11 @@ export function CharacterModel3D({
     const dJumpAge = lastDoubleJumpAt > 0 ? (nowMs - lastDoubleJumpAt) / 1000 : 99;
     const inDoubleJumpSpin = !isGrounded && dJumpAge >= 0 && dJumpAge < 0.42;
 
-    // 1. Advance locomotion cycle smoothly based on ground movement
     const isMovingSide =
       Math.abs(moveRight) > Math.abs(moveForward) * 1.1 && Math.abs(moveRight) > 0.18;
     const isBack = moveForward < -0.2;
-    if (isMoving && isGrounded) {
-      const rate = isCrouching ? 7.4 : isSprinting ? 13.2 : 9.6;
+    if (isMoving && isGrounded && !isSliding) {
+      const rate = isCrouching ? 7.4 : isSprinting ? 13.4 : 9.6;
       stridePhase.current += dt * rate * (isBack ? -1 : 1);
     }
 
@@ -174,25 +216,34 @@ export function CharacterModel3D({
     }
 
     const p = stridePhase.current;
-    const swing = isMoving && isGrounded ? (isSprinting ? 0.88 : isCrouching ? 0.5 : 0.66) : 0;
-    const breathe = Math.sin(t * 2.4) * 0.015;
-    const walkBob = isMoving && isGrounded ? Math.abs(Math.sin(p)) : 0;
+    const swing =
+      isMoving && isGrounded && !isSliding
+        ? isSprinting
+          ? 0.9
+          : isCrouching
+            ? 0.5
+            : 0.68
+        : 0;
+    const breathe = Math.sin(t * 2.3) * 0.014;
+    const walkBob = isMoving && isGrounded && !isSliding ? Math.abs(Math.sin(p)) : 0;
 
-    // Lower-body turn toward stride direction when strafing or moving diagonally
     const lowerMoveYaw =
-      isMoving && isGrounded
+      isMoving && isGrounded && !isSliding
         ? THREE.MathUtils.clamp(Math.atan2(-moveRight, Math.abs(moveForward) + 0.35), -0.55, 0.55)
         : 0;
 
-    // 2. Pelvis height, crouch tuck, forward sprint lean & lower-body heading
+    // 1. Pelvis height, kinetic slide posture, crouch tuck & stride lean
     if (pelvisRef.current) {
-      const targetPelvisY = isCrouching
-        ? -0.34
-        : !isGrounded
-          ? 0.06
-          : isMoving
-            ? -0.05 + walkBob * (isSprinting ? 0.05 : 0.028)
-            : -0.02 + breathe * 0.4;
+      const targetPelvisY = isSliding
+        ? -0.52
+        : isCrouching
+          ? -0.34
+          : !isGrounded
+            ? 0.06
+            : isMoving
+              ? -0.05 + walkBob * (isSprinting ? 0.052 : 0.028)
+              : -0.02 + breathe * 0.4;
+
       pelvisRef.current.position.y = THREE.MathUtils.damp(
         pelvisRef.current.position.y,
         targetPelvisY,
@@ -200,14 +251,16 @@ export function CharacterModel3D({
         dt,
       );
 
-      const targetRoll = isMovingSide ? -moveRight * 0.1 : 0;
-      const targetLeanPitch = dashing
-        ? -0.38
-        : isSprinting && isMoving
-          ? -0.14
-          : isCrouching
-            ? -0.14
-            : 0;
+      const targetRoll = isSliding ? 0.16 : isMovingSide ? -moveRight * 0.1 : 0;
+      const targetLeanPitch = isSliding
+        ? 0.48
+        : dashing
+          ? -0.38
+          : isSprinting && isMoving
+            ? -0.15
+            : isCrouching
+              ? -0.14
+              : 0;
 
       pelvisRef.current.rotation.y = THREE.MathUtils.damp(
         pelvisRef.current.rotation.y,
@@ -229,7 +282,7 @@ export function CharacterModel3D({
       );
     }
 
-    // 3. Legs: Natural Hip + Knee Articulation (Idle / Walk / Back / Strafe / Crouch / Airborne)
+    // 2. Realistic Leg Kinematics (including Kinetic Slide)
     let hipLX: number;
     let hipRX: number;
     let kneeLX: number;
@@ -237,8 +290,14 @@ export function CharacterModel3D({
     let hipLZ = 0;
     let hipRZ = 0;
 
-    if (!isGrounded) {
-      // Tactical mid-air knee tuck
+    if (isSliding) {
+      // Right leg extended forward sliding on boot, left knee bent tucked under
+      hipRX = 1.08;
+      kneeRX = -0.22;
+      hipLX = 0.25;
+      kneeLX = -1.35;
+      hipLZ = -0.18;
+    } else if (!isGrounded) {
       hipLX = 0.55;
       kneeLX = -1.02;
       hipRX = 0.25;
@@ -266,7 +325,6 @@ export function CharacterModel3D({
       kneeLX = -0.94;
       kneeRX = -0.84;
     } else {
-      // Balanced combat ready stance (wide shoulder-width feet)
       hipLX = 0.07;
       hipRX = -0.07;
       kneeLX = -0.07;
@@ -290,26 +348,31 @@ export function CharacterModel3D({
       kneeRRef.current.rotation.x = THREE.MathUtils.damp(kneeRRef.current.rotation.x, kneeRX, 18, dt);
     }
 
-    // 4. Upper Torso & Head: Counter-rotate pelvis heading so shoulders/weapon always aim straight forward (-Z)
+    // 3. Upper Torso & Tactical Q/E Lean Peek
     const isOneHand = weaponId === "pistol" || weaponId === "revolver";
-    const sprintingWeaponCarry = isSprinting && isMoving && !isAiming && !isReloading;
-
-    // Slight bladed combat stance (-0.16 rad twists right shoulder slightly back so rifle tucks cleanly)
+    const sprintingWeaponCarry = isSprinting && isMoving && !isAiming && !isReloading && !isSliding;
     const desiredTorsoWorldYaw = sprintingWeaponCarry ? 0.14 : isAiming ? -0.18 : -0.14;
     const torsoLocalYaw = desiredTorsoWorldYaw - lowerMoveYaw;
 
     if (torsoRef.current) {
       const flinchX = hitActive ? -0.22 * hitIntensity : 0;
-      const counterSprintLean = sprintingWeaponCarry ? 0.04 : 0;
+      const counterSlidePitch = isSliding ? -0.45 : sprintingWeaponCarry ? 0.04 : 0;
+      const leanRoll = -(lean || 0) * 0.28;
       torsoRef.current.rotation.x = THREE.MathUtils.damp(
         torsoRef.current.rotation.x,
-        clampedPitch * 0.25 + shotKick * 0.06 + flinchX + breathe + counterSprintLean,
+        clampedPitch * 0.25 + shotKick * 0.06 + flinchX + breathe + counterSlidePitch,
         18,
         dt,
       );
       torsoRef.current.rotation.y = THREE.MathUtils.damp(
         torsoRef.current.rotation.y,
         torsoLocalYaw,
+        16,
+        dt,
+      );
+      torsoRef.current.rotation.z = THREE.MathUtils.damp(
+        torsoRef.current.rotation.z,
+        leanRoll,
         16,
         dt,
       );
@@ -323,7 +386,6 @@ export function CharacterModel3D({
         20,
         dt,
       );
-      // Keep head facing dead ahead (canceling torso twist)
       headRef.current.rotation.y = THREE.MathUtils.damp(
         headRef.current.rotation.y,
         -desiredTorsoWorldYaw * 0.85,
@@ -332,12 +394,9 @@ export function CharacterModel3D({
       );
     }
 
-    // 5. Combat Arms & Weapon Pivot Kinematics:
-    // +rotation.x swings hanging arm FORWARD (-Z).
-    // +shoulder.rotation.y swings arm OUT/RIGHT? Check: +Y turns -Z toward -X (LEFT = INWARD for Right shoulder).
-    // Right shoulder (+X) uses +ry to reach INWARD toward chest center; Left shoulder (-X) uses -ry to reach INWARD.
+    // 4. Arms & Weapon Pivot Kinematics
     if (shoulderRRef.current && elbowRRef.current && weaponPivotRef.current) {
-      const armWalkSway = isMoving && isGrounded ? Math.sin(p) * (isSprinting ? 0.07 : 0.03) : 0;
+      const armWalkSway = isMoving && isGrounded && !isSliding ? Math.sin(p) * (isSprinting ? 0.07 : 0.03) : 0;
       const targetShRX = sprintingWeaponCarry
         ? 0.42 + armWalkSway
         : isReloading
@@ -362,29 +421,11 @@ export function CharacterModel3D({
             ? (isAiming ? 0.35 : 0.52)
             : (isAiming ? 1.18 : 1.12);
 
-      shoulderRRef.current.rotation.x = THREE.MathUtils.damp(
-        shoulderRRef.current.rotation.x,
-        targetShRX,
-        22,
-        dt,
-      );
-      shoulderRRef.current.rotation.y = THREE.MathUtils.damp(
-        shoulderRRef.current.rotation.y,
-        targetShRY,
-        18,
-        dt,
-      );
-      elbowRRef.current.rotation.x = THREE.MathUtils.damp(
-        elbowRRef.current.rotation.x,
-        targetElRX,
-        22,
-        dt,
-      );
+      shoulderRRef.current.rotation.x = THREE.MathUtils.damp(shoulderRRef.current.rotation.x, targetShRX, 22, dt);
+      shoulderRRef.current.rotation.y = THREE.MathUtils.damp(shoulderRRef.current.rotation.y, targetShRY, 18, dt);
+      elbowRRef.current.rotation.x = THREE.MathUtils.damp(elbowRRef.current.rotation.x, targetElRX, 22, dt);
 
-      // CRITICAL: WeaponModel3D barrel points along local -Z with grip at origin!
-      // Cancel accumulated (shoulderR.x + elbowR.x) so barrel stays horizontal + follows aim pitch!
-      const curArmPitch =
-        shoulderRRef.current.rotation.x + elbowRRef.current.rotation.x;
+      const curArmPitch = shoulderRRef.current.rotation.x + elbowRRef.current.rotation.x;
       const curArmYaw = shoulderRRef.current.rotation.y;
 
       const desiredWeaponPitch = sprintingWeaponCarry
@@ -393,7 +434,6 @@ export function CharacterModel3D({
           ? -0.35
           : clampedPitch * 0.72 + shotKick * 0.1;
 
-      // Keep barrel aimed forward (-Z) during ready/ADS, or angled across chest (+0.62 rad -> left-forward) when sprinting!
       const desiredWeaponYaw = sprintingWeaponCarry
         ? 0.62 + Math.cos(p) * 0.06
         : -desiredTorsoWorldYaw;
@@ -402,7 +442,9 @@ export function CharacterModel3D({
         ? 0.25
         : isReloading
           ? 0.38
-          : 0;
+          : isSliding
+            ? -0.28
+            : 0;
 
       weaponPivotRef.current.rotation.x = -curArmPitch + desiredWeaponPitch;
       weaponPivotRef.current.rotation.y = -curArmYaw + desiredWeaponYaw;
@@ -425,62 +467,38 @@ export function CharacterModel3D({
       let shLY: number;
       let shLZ: number;
       let elLX: number;
-      const walkArmBob = isMoving && isGrounded ? Math.sin(p) * 0.05 : 0;
+      const walkArmBob = isMoving && isGrounded && !isSliding ? Math.sin(p) * 0.05 : 0;
 
       if (isReloading) {
-        // Left hand reaches down to magwell and inserts fresh magazine
         const magDip = Math.sin(reloadPhase.current);
         shLX = 0.65 + magDip * 0.35;
         shLY = -0.52;
         shLZ = 0.08;
         elLX = 0.92 + magDip * 0.28;
       } else if (sprintingWeaponCarry) {
-        // Left hand supports rifle handguard across the chest while sprinting
         shLX = 0.68 - walkArmBob * 0.8;
         shLY = -0.45;
         shLZ = 0.14;
         elLX = 0.95;
       } else if (isOneHand) {
-        // Two-handed tactical weaver pistol support OR crisp off-hand guard
         shLX = 1.05 + clampedPitch * 0.65 + walkArmBob * 0.3;
         shLY = -0.62;
         shLZ = 0.12;
         elLX = 0.48;
       } else {
-        // Two-handed rifle/SMG/shotgun/sniper foregrip lock directly onto barrel handguard
         shLX = (isAiming ? 0.82 : 0.72) + clampedPitch * 0.65 + shotKick * 0.1 + walkArmBob * 0.35;
         shLY = isAiming ? -0.66 : -0.62;
         shLZ = 0.1;
         elLX = isAiming ? 0.68 : 0.74;
       }
 
-      shoulderLRef.current.rotation.x = THREE.MathUtils.damp(
-        shoulderLRef.current.rotation.x,
-        shLX,
-        20,
-        dt,
-      );
-      shoulderLRef.current.rotation.y = THREE.MathUtils.damp(
-        shoulderLRef.current.rotation.y,
-        shLY,
-        18,
-        dt,
-      );
-      shoulderLRef.current.rotation.z = THREE.MathUtils.damp(
-        shoulderLRef.current.rotation.z,
-        shLZ,
-        18,
-        dt,
-      );
-      elbowLRef.current.rotation.x = THREE.MathUtils.damp(
-        elbowLRef.current.rotation.x,
-        elLX,
-        20,
-        dt,
-      );
+      shoulderLRef.current.rotation.x = THREE.MathUtils.damp(shoulderLRef.current.rotation.x, shLX, 20, dt);
+      shoulderLRef.current.rotation.y = THREE.MathUtils.damp(shoulderLRef.current.rotation.y, shLY, 18, dt);
+      shoulderLRef.current.rotation.z = THREE.MathUtils.damp(shoulderLRef.current.rotation.z, shLZ, 18, dt);
+      elbowLRef.current.rotation.x = THREE.MathUtils.damp(elbowLRef.current.rotation.x, elLX, 20, dt);
     }
 
-    // 6. Hit emissive reaction & shield/beacon polish
+    // 5. Hit Flash & Shield Feedback
     if (pelvisRef.current && (hitIntensity > 0.05 || wasHitFlashing.current)) {
       const nextFlash = hitIntensity > 0.05;
       wasHitFlashing.current = nextFlash;
@@ -519,36 +537,89 @@ export function CharacterModel3D({
 
   return (
     <group ref={rootRef} position={[0, 0, 0]}>
-      {/* Unified Articulated Rig: Pelvis centered so boots rest at y = -1.0 */}
       <group ref={pelvisRef} position={[0, -0.02, 0]}>
+        {/* Pelvis + Tactical Utility Belt & Buckle */}
         <mesh castShadow geometry={SCULPTED_GEOS.pelvis} material={mats.uniformSecondary} />
+        <mesh castShadow position={[0, 0.04, 0]} material={mats.gearDark}>
+          <boxGeometry args={[0.36, 0.065, 0.24]} />
+        </mesh>
+        <mesh position={[0, 0.04, -0.125]} material={mats.armor}>
+          <boxGeometry args={[0.075, 0.055, 0.02]} />
+        </mesh>
+        {/* Belt hip pouches */}
+        <mesh castShadow position={[-0.185, 0.02, -0.02]} material={mats.pouchMat}>
+          <boxGeometry args={[0.05, 0.1, 0.09]} />
+        </mesh>
+        <mesh castShadow position={[0.185, 0.02, 0.02]} material={mats.pouchMat}>
+          <boxGeometry args={[0.05, 0.09, 0.08]} />
+        </mesh>
 
-        {/* Left Leg (Hip -> Thigh -> Knee -> Shin -> Boot) */}
+        {/* Left Leg + Tactical Knee Pad + Combat Boot */}
         <group ref={hipLRef} position={[-0.11, -0.06, 0]}>
           <mesh castShadow position={[0, -0.195, 0]} geometry={SCULPTED_GEOS.thigh} material={mats.uniformPrimary} />
+          {/* Thigh utility strap */}
+          <mesh position={[0, -0.18, 0]} material={mats.gearDark}>
+            <cylinderGeometry args={[0.092, 0.09, 0.04, 10]} />
+          </mesh>
           <group ref={kneeLRef} position={[0, -0.39, 0]}>
+            {/* Sculpted Hard-Shell Knee Pad */}
+            <mesh castShadow position={[0, 0.01, -0.078]} material={mats.gearDark}>
+              <boxGeometry args={[0.095, 0.11, 0.042]} />
+            </mesh>
             <mesh castShadow position={[0, -0.195, 0]} geometry={SCULPTED_GEOS.shin} material={mats.uniformSecondary} />
             <mesh castShadow position={[0, -0.42, -0.03]} geometry={SCULPTED_GEOS.boot} material={mats.boots} />
           </group>
         </group>
 
-        {/* Right Leg */}
+        {/* Right Leg + Drop-Leg Sidearm Holster + Knee Pad + Boot */}
         <group ref={hipRRef} position={[0.11, -0.06, 0]}>
           <mesh castShadow position={[0, -0.195, 0]} geometry={SCULPTED_GEOS.thigh} material={mats.uniformPrimary} />
+          {/* Drop-leg Tactical Holster */}
+          <mesh castShadow position={[0.09, -0.18, -0.01]} material={mats.gearDark}>
+            <boxGeometry args={[0.055, 0.14, 0.085]} />
+          </mesh>
           <group ref={kneeRRef} position={[0, -0.39, 0]}>
+            <mesh castShadow position={[0, 0.01, -0.078]} material={mats.gearDark}>
+              <boxGeometry args={[0.095, 0.11, 0.042]} />
+            </mesh>
             <mesh castShadow position={[0, -0.195, 0]} geometry={SCULPTED_GEOS.shin} material={mats.uniformSecondary} />
             <mesh castShadow position={[0, -0.42, -0.03]} geometry={SCULPTED_GEOS.boot} material={mats.boots} />
           </group>
         </group>
 
-        {/* Upper Spine & Torso Armor */}
+        {/* Upper Spine, Kevlar Plate Carrier, Magazine Pouches & Radio */}
         <group ref={torsoRef} position={[0, 0.08, 0]}>
+          {/* Inner Combat Shirt Torso */}
+          <mesh castShadow position={[0, 0.24, 0]} material={mats.uniformPrimary}>
+            <cylinderGeometry args={[0.18, 0.16, 0.44, 12]} />
+          </mesh>
+          {/* Sculpted Ballistic Plate Carrier */}
           <mesh castShadow userData={{ flashable: true }} position={[0, 0.24, 0]} geometry={SCULPTED_GEOS.chestArmor} material={mats.armor} />
-          <mesh castShadow userData={{ flashable: true }} position={[0, 0.24, 0.14]} geometry={SCULPTED_GEOS.backpack} material={mats.uniformSecondary} />
+          {/* 3x Front Rifle Magazine Pouches on Chest Rig */}
+          {[-0.085, 0, 0.085].map((px, idx) => (
+            <mesh key={idx} castShadow position={[px, 0.15, -0.145]} material={mats.pouchMat}>
+              <boxGeometry args={[0.062, 0.125, 0.05]} />
+            </mesh>
+          ))}
+          {/* Tactical Shoulder Straps & Comms Radio + Whip Antenna */}
+          <mesh position={[-0.12, 0.42, -0.03]} material={mats.gearDark}>
+            <boxGeometry args={[0.058, 0.09, 0.18]} />
+          </mesh>
+          <mesh position={[0.12, 0.42, -0.03]} material={mats.gearDark}>
+            <boxGeometry args={[0.058, 0.09, 0.18]} />
+          </mesh>
+          <mesh castShadow position={[-0.12, 0.31, -0.135]} material={mats.gearDark}>
+            <boxGeometry args={[0.045, 0.09, 0.035]} />
+          </mesh>
+          <mesh position={[-0.13, 0.48, 0.13]} material={mats.gearDark}>
+            <cylinderGeometry args={[0.005, 0.006, 0.28, 6]} />
+          </mesh>
 
-          {/* Class-specific Backpack / Trauma Cross Accent */}
+          {/* Tactical Assault Backpack */}
+          <mesh castShadow userData={{ flashable: true }} position={[0, 0.24, 0.145]} geometry={SCULPTED_GEOS.backpack} material={mats.uniformSecondary} />
+
           {isMedic && (
-            <group position={[0, 0.25, 0.205]}>
+            <group position={[0, 0.25, 0.21]}>
               <mesh>
                 <boxGeometry args={[0.12, 0.035, 0.015]} />
                 <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={1.4} />
@@ -566,11 +637,11 @@ export function CharacterModel3D({
             </mesh>
           )}
 
-          {/* Team IFF Tactical Chest & Back Patch */}
+          {/* Team IFF Patch */}
           {team !== "none" && (
-            <group position={[0, 0.28, 0]}>
-              <mesh position={[0, 0, -0.135]}>
-                <boxGeometry args={[0.16, 0.05, 0.02]} />
+            <group position={[0, 0.31, 0]}>
+              <mesh position={[0, 0, -0.142]}>
+                <boxGeometry args={[0.14, 0.042, 0.018]} />
                 <meshStandardMaterial
                   ref={beaconMatRef}
                   color={teamBadge}
@@ -578,8 +649,8 @@ export function CharacterModel3D({
                   emissiveIntensity={1.8}
                 />
               </mesh>
-              <mesh position={[0, 0, 0.205]}>
-                <boxGeometry args={[0.16, 0.05, 0.02]} />
+              <mesh position={[0, 0, 0.21]}>
+                <boxGeometry args={[0.14, 0.042, 0.018]} />
                 <meshStandardMaterial
                   color={teamBadge}
                   emissive={teamBadge}
@@ -589,42 +660,63 @@ export function CharacterModel3D({
             </group>
           )}
 
-          {/* Neck + Head + Distinct Same-Proportion Headgear & Visor */}
+          {/* Anatomical Neck + Shemagh Collar */}
+          <mesh castShadow position={[0, 0.46, 0]} material={mats.balaclava}>
+            <cylinderGeometry args={[0.072, 0.088, 0.11, 12]} />
+          </mesh>
+
+          {/* Realistic Sculpted Head + Balaclava + FAST Helmet + Comtac Headset + NVG */}
           <group ref={headRef} position={[0, 0.56, 0]}>
+            {/* Head upper skin */}
             <mesh castShadow geometry={SCULPTED_GEOS.head} material={mats.skinTone} />
+            {/* Lower face tactical balaclava mask */}
+            <mesh castShadow position={[0, -0.042, -0.012]} material={mats.balaclava}>
+              <cylinderGeometry args={[0.122, 0.105, 0.125, 14]} />
+            </mesh>
+            {/* Comtac Tactical Headset Earcups + Mic */}
+            <mesh position={[0.132, -0.005, 0]} material={mats.gearDark}>
+              <boxGeometry args={[0.04, 0.085, 0.072]} />
+            </mesh>
+            <mesh position={[-0.132, -0.005, 0]} material={mats.gearDark}>
+              <boxGeometry args={[0.04, 0.085, 0.072]} />
+            </mesh>
+
             {isCommando ? (
-              /* Commando Slanted Beret + Headset Earcup */
+              <mesh castShadow position={[-0.02, 0.095, 0]} rotation={[0.1, 0, -0.26]}>
+                <cylinderGeometry args={[0.145, 0.135, 0.075, 14]} />
+                <meshStandardMaterial color="#991b1b" roughness={0.75} />
+              </mesh>
+            ) : (
               <group>
-                <mesh castShadow position={[-0.02, 0.09, 0]} rotation={[0.1, 0, -0.26]}>
-                  <cylinderGeometry args={[0.145, 0.135, 0.075, 14]} />
-                  <meshStandardMaterial color="#991b1b" roughness={0.75} />
+                <mesh
+                  castShadow
+                  position={[0, 0.042, 0]}
+                  geometry={isHeavy ? SCULPTED_GEOS.heavyHelmet : SCULPTED_GEOS.helmet}
+                  material={mats.armor}
+                />
+                {/* Front NVG Shroud Mount + Flipped-up Dual Night-Vision Tubes */}
+                <mesh position={[0, 0.11, -0.135]} material={mats.gearDark}>
+                  <boxGeometry args={[0.075, 0.045, 0.045]} />
                 </mesh>
-                <mesh position={[0.14, 0.01, 0]} material={mats.armor}>
-                  <boxGeometry args={[0.035, 0.08, 0.07]} />
+                <mesh position={[-0.032, 0.13, -0.16]} rotation={[Math.PI / 2 - 0.35, 0, 0]} material={mats.gearDark}>
+                  <cylinderGeometry args={[0.019, 0.019, 0.068, 10]} />
                 </mesh>
-                <mesh position={[-0.14, 0.01, 0]} material={mats.armor}>
-                  <boxGeometry args={[0.035, 0.08, 0.07]} />
+                <mesh position={[0.032, 0.13, -0.16]} rotation={[Math.PI / 2 - 0.35, 0, 0]} material={mats.gearDark}>
+                  <cylinderGeometry args={[0.019, 0.019, 0.068, 10]} />
                 </mesh>
               </group>
-            ) : (
-              <mesh
-                castShadow
-                position={[0, 0.04, 0]}
-                geometry={isHeavy ? SCULPTED_GEOS.heavyHelmet : SCULPTED_GEOS.helmet}
-                material={mats.armor}
-              />
             )}
 
-            <mesh position={[0, 0.025, -0.12]} geometry={SCULPTED_GEOS.visor} material={mats.visor} />
+            {/* Ballistic Goggles / Visor */}
+            <mesh position={[0, 0.025, -0.122]} geometry={SCULPTED_GEOS.visor} material={mats.visor} />
 
             {isJuggernaut && (
-              <mesh castShadow position={[0, -0.05, -0.12]} material={mats.armor}>
+              <mesh castShadow position={[0, -0.05, -0.125]} material={mats.armor}>
                 <boxGeometry args={[0.21, 0.08, 0.06]} />
               </mesh>
             )}
 
             {isSniper && (
-              /* Ballistic Rangefinder Monocle Lens */
               <mesh position={[0.085, 0.035, -0.155]} rotation={[Math.PI / 2, 0, 0]}>
                 <cylinderGeometry args={[0.028, 0.028, 0.05, 10]} />
                 <meshStandardMaterial color="#facc15" emissive="#facc15" emissiveIntensity={2.0} />
@@ -645,25 +737,35 @@ export function CharacterModel3D({
             )}
           </group>
 
-          {/* Right Shoulder -> Upper Arm -> Elbow -> Forearm -> Weapon Hand Socket */}
+          {/* Right Arm + Elbow Pad + Weapon Socket */}
           <group ref={shoulderRRef} position={[0.22, 0.39, 0]}>
             <mesh castShadow geometry={SCULPTED_GEOS.shoulderPad} material={mats.armor} />
             <mesh castShadow position={[0, -0.14, 0]} geometry={SCULPTED_GEOS.upperArm} material={mats.uniformPrimary} />
             <group ref={elbowRRef} position={[0, -0.28, 0]}>
+              <mesh castShadow position={[0, 0, 0.055]} material={mats.gearDark}>
+                <boxGeometry args={[0.072, 0.085, 0.032]} />
+              </mesh>
               <mesh castShadow position={[0, -0.135, 0]} geometry={SCULPTED_GEOS.forearm} material={mats.uniformPrimary} />
               <mesh castShadow position={[0, -0.27, 0]} geometry={SCULPTED_GEOS.glove} material={mats.boots} />
-              {/* Weapon Pivot Mounted Upright in Right Hand (Barrel points along -Z) */}
-              <group ref={weaponPivotRef} position={[-0.02, -0.27, -0.02]} scale={weaponId === "pistol" ? 0.94 : 0.86}>
-                <WeaponModel3D weaponId={weaponId} isReloading={isReloading} skinId={resolvedSkinId} />
+              <group ref={weaponPivotRef} position={[-0.02, -0.27, -0.02]} scale={weaponId === "pistol" || weaponId === "revolver" ? 0.94 : 0.86}>
+                <WeaponModel3D
+                  weaponId={weaponId}
+                  isReloading={isReloading}
+                  skinId={resolvedSkinId}
+                  attachments={weaponAttachments}
+                />
               </group>
             </group>
           </group>
 
-          {/* Left Shoulder -> Upper Arm -> Elbow -> Support Forearm */}
+          {/* Left Arm + Elbow Pad */}
           <group ref={shoulderLRef} position={[-0.22, 0.39, 0]}>
             <mesh castShadow geometry={SCULPTED_GEOS.shoulderPad} material={mats.armor} />
             <mesh castShadow position={[0, -0.14, 0]} geometry={SCULPTED_GEOS.upperArm} material={mats.uniformPrimary} />
             <group ref={elbowLRef} position={[0, -0.28, 0]}>
+              <mesh castShadow position={[0, 0, 0.055]} material={mats.gearDark}>
+                <boxGeometry args={[0.072, 0.085, 0.032]} />
+              </mesh>
               <mesh castShadow position={[0, -0.135, 0]} geometry={SCULPTED_GEOS.forearm} material={mats.uniformPrimary} />
               <mesh castShadow position={[0, -0.27, 0]} geometry={SCULPTED_GEOS.glove} material={mats.boots} />
             </group>
@@ -676,11 +778,11 @@ export function CharacterModel3D({
         <mesh ref={shieldRef} position={[0, 0, 0]}>
           <icosahedronGeometry args={[1.15, 1]} />
           <meshStandardMaterial
-            color="#22c55e"
-            emissive="#22c55e"
+            color="#06b6d4"
+            emissive="#06b6d4"
             emissiveIntensity={1.1}
             transparent
-            opacity={0.22}
+            opacity={0.2}
             wireframe
           />
         </mesh>

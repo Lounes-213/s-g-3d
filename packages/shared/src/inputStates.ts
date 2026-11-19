@@ -7,6 +7,13 @@ export const movementState = {
   sprint: false,
   crouch: false,
   jump: false,
+  lean: 0 as -1 | 0 | 1,
+  isSliding: false,
+  slideUntil: 0,
+  slideCooldownUntil: 0,
+  slideDirX: 0,
+  slideDirZ: 0,
+  holdBreath: false,
 };
 
 // read once per click/press

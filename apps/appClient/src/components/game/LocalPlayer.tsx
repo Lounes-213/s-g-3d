@@ -10,10 +10,13 @@ import {
   MAPS,
   PHYSICS_CONFIG,
   PLAYER_CONFIG,
-  WEAPONS,
+  SCOPE_ORDER,
+  SCOPES,
   WEAPON_ORDER,
   combatState,
+  computeEffectiveWeaponStats,
   computeMuzzleWorldPos,
+  getDefaultAttachments,
   movementState,
   raycastMapBoxes,
   type SkillId,
@@ -46,6 +49,7 @@ const LocalPlayer = () => {
 
   const perspective = useSettingsStore((state) => state.perspective);
   const fov = useSettingsStore((state) => state.fov);
+  const allAttachments = useSettingsStore((state) => state.weaponAttachments);
 
   const playerPos = useRef(new THREE.Vector3(0, 1.5, 0));
   const localBodyY = useRef(1.0);
@@ -71,6 +75,8 @@ const LocalPlayer = () => {
   const currentYaw = useRef(0);
   const currentPitch = useRef(0);
   const smoothCamDist = useRef(3.4);
+  const smoothLean = useRef(0);
+  const recoilPitchVel = useRef(0);
 
   // Pre-allocated vectors for zero-GC frame loop
   const direction = useRef(new THREE.Vector3());
@@ -88,7 +94,6 @@ const LocalPlayer = () => {
   const shootDirRef = useRef(new THREE.Vector3());
   const muzzleVecRef = useRef(new THREE.Vector3());
 
-  // Reset initialization & build Cannon-es arena colliders when map or localId changes
   useEffect(() => {
     arenaPhysics.initMap(mapId);
     initialized.current = false;
@@ -100,6 +105,12 @@ const LocalPlayer = () => {
       const st = useGameStore.getState();
       const curMe = st.localId ? st.players[st.localId] : null;
       if (curMe?.isDead) return;
+
+      // Cancel slide on jump for fluid slide-cancel movement
+      if (movementState.isSliding) {
+        movementState.isSliding = false;
+        movementState.slideUntil = 0;
+      }
 
       if (localGrounded.current) {
         localVy.current = PHYSICS_CONFIG.JUMP_FORCE;
@@ -122,6 +133,70 @@ const LocalPlayer = () => {
       } else if (channel) {
         channel.emit("jump");
       }
+    };
+
+    const triggerSlideIfEligible = () => {
+      const now = Date.now();
+      const isSprintMoving =
+        (movementState.sprint || touchInputState.sprintActive || useSettingsStore.getState().autoSprint) &&
+        (movementState.forward || touchInputState.moveY > 0.35);
+      if (
+        localGrounded.current &&
+        isSprintMoving &&
+        !movementState.isSliding &&
+        now >= movementState.slideCooldownUntil
+      ) {
+        const yaw = currentYaw.current;
+        movementState.isSliding = true;
+        movementState.slideUntil = now + PHYSICS_CONFIG.SLIDE_DURATION_MS;
+        movementState.slideCooldownUntil = now + PHYSICS_CONFIG.SLIDE_COOLDOWN_MS;
+        movementState.slideDirX = -Math.sin(yaw);
+        movementState.slideDirZ = -Math.cos(yaw);
+        soundEngine.playSlide();
+      }
+    };
+
+    const handleCycleScope = () => {
+      const st = useGameStore.getState();
+      const curMe = st.localId ? st.players[st.localId] : null;
+      if (!curMe || curMe.isDead) return;
+      const wId = curMe.currentWeapon;
+      const settings = useSettingsStore.getState();
+      const curScope = settings.getWeaponAttachments(wId).scope;
+      const idx = SCOPE_ORDER.indexOf(curScope);
+      const nextScope = SCOPE_ORDER[(idx + 1) % SCOPE_ORDER.length];
+      settings.setWeaponAttachment(wId, "scope", nextScope);
+      soundEngine.playScopeZoom();
+      st.showLootNotice(`Optic: ${SCOPES[nextScope].name} (${SCOPES[nextScope].zoom.toFixed(1)}x)`, "rare");
+    };
+
+    const handleLootInteract = () => {
+      if (playMode === "solo") {
+        soloEngine.pickupNearbyLoot();
+      }
+    };
+
+    const handleArmorPlate = () => {
+      if (playMode === "solo") {
+        soloEngine.useArmorPlateLocal();
+      }
+    };
+
+    const handleMedkit = () => {
+      if (playMode === "solo") {
+        soloEngine.useMedkitLocal();
+      }
+    };
+
+    const handleLeanToggle = (e: Event) => {
+      const custom = e as CustomEvent<{ dir: -1 | 0 | 1 }>;
+      const dir = custom.detail?.dir ?? 0;
+      movementState.lean = movementState.lean === dir ? 0 : dir;
+      soundEngine.playClick();
+    };
+
+    const handleTouchSlide = () => {
+      triggerSlideIfEligible();
     };
 
     const handleJumpPad = (e: Event) => {
@@ -148,6 +223,12 @@ const LocalPlayer = () => {
 
     window.addEventListener("local-jump-pad", handleJumpPad);
     window.addEventListener("local-touch-jump", triggerJumpAction);
+    window.addEventListener("local-touch-slide", handleTouchSlide);
+    window.addEventListener("local-loot-interact", handleLootInteract);
+    window.addEventListener("local-armor-plate", handleArmorPlate);
+    window.addEventListener("local-medkit", handleMedkit);
+    window.addEventListener("local-cycle-scope", handleCycleScope);
+    window.addEventListener("local-lean-toggle", handleLeanToggle);
     window.addEventListener("local-team-switched", handleTeamSwitched);
 
     const emitWeaponSwitch = (weaponId: WeaponId) => {
@@ -189,16 +270,35 @@ const LocalPlayer = () => {
       if (code === kb.moveBackward) movementState.backward = true;
       if (code === kb.moveLeft) movementState.left = true;
       if (code === kb.moveRight) movementState.right = true;
-      if (code === kb.crouch) movementState.crouch = true;
+      if (code === kb.crouch) {
+        if (!e.repeat) {
+          triggerSlideIfEligible();
+        }
+        movementState.crouch = true;
+      }
 
-      if (code === kb.sprint && !e.repeat) {
-        if (settings.sprintMode === "toggle") {
-          sprintToggled.current = !sprintToggled.current;
-          movementState.sprint = sprintToggled.current;
-        } else {
-          movementState.sprint = true;
+      if (code === kb.sprint) {
+        movementState.holdBreath = true;
+        if (!e.repeat) {
+          if (settings.sprintMode === "toggle") {
+            sprintToggled.current = !sprintToggled.current;
+            movementState.sprint = sprintToggled.current;
+          } else {
+            movementState.sprint = true;
+          }
         }
       }
+
+      if (code === kb.leanLeft && !e.repeat) {
+        movementState.lean = movementState.lean === -1 ? 0 : -1;
+      }
+      if (code === kb.leanRight && !e.repeat) {
+        movementState.lean = movementState.lean === 1 ? 0 : 1;
+      }
+      if (code === kb.interact && !e.repeat) handleLootInteract();
+      if (code === kb.armorPlate && !e.repeat) handleArmorPlate();
+      if (code === kb.medkit && !e.repeat) handleMedkit();
+      if (code === kb.cycleScope && !e.repeat) handleCycleScope();
 
       if (code === kb.jump && !e.repeat) {
         movementState.jump = true;
@@ -249,8 +349,11 @@ const LocalPlayer = () => {
       if (code === kb.moveBackward) movementState.backward = false;
       if (code === kb.moveLeft) movementState.left = false;
       if (code === kb.moveRight) movementState.right = false;
-      if (code === kb.sprint && settings.sprintMode === "hold") {
-        movementState.sprint = false;
+      if (code === kb.sprint) {
+        movementState.holdBreath = false;
+        if (settings.sprintMode === "hold") {
+          movementState.sprint = false;
+        }
       }
       if (code === kb.crouch) movementState.crouch = false;
       if (code === kb.jump) movementState.jump = false;
@@ -302,6 +405,12 @@ const LocalPlayer = () => {
     return () => {
       window.removeEventListener("local-jump-pad", handleJumpPad);
       window.removeEventListener("local-touch-jump", triggerJumpAction);
+      window.removeEventListener("local-touch-slide", handleTouchSlide);
+      window.removeEventListener("local-loot-interact", handleLootInteract);
+      window.removeEventListener("local-armor-plate", handleArmorPlate);
+      window.removeEventListener("local-medkit", handleMedkit);
+      window.removeEventListener("local-cycle-scope", handleCycleScope);
+      window.removeEventListener("local-lean-toggle", handleLeanToggle);
       window.removeEventListener("local-team-switched", handleTeamSwitched);
       window.removeEventListener("contextmenu", handleContextMenu);
       window.removeEventListener("mousedown", handleMouseDown);
@@ -317,22 +426,37 @@ const LocalPlayer = () => {
 
     const dt = Math.min(delta, 0.05);
     const camera = state.camera as THREE.PerspectiveCamera;
-    const curMe = useGameStore.getState().players[localId];
-    const map = MAPS[mapId] || MAPS.veridian_04;
+    const gameStoreState = useGameStore.getState();
+    const curMe = gameStoreState.players[localId];
+    const map = MAPS[mapId] || MAPS.royale_valley;
     const nowPerf = performance.now();
+    const nowEpoch = Date.now();
 
     const activeWeaponId: WeaponId = curMe?.currentWeapon || "assaultRifle";
-    const wpnStats = WEAPONS[activeWeaponId] || WEAPONS.assaultRifle;
+    const liveSettings = useSettingsStore.getState();
+    const activeAtt = liveSettings.getWeaponAttachments(activeWeaponId);
+    const wpnStats = computeEffectiveWeaponStats(activeWeaponId, activeAtt);
     const baseFov = fov;
     const zoomRatio = THREE.MathUtils.clamp(
       camera.fov / Math.max(10, baseFov),
-      0.16,
+      0.12,
       1.0,
     );
 
     if (controlsRef.current) {
-      controlsRef.current.pointerSpeed =
-        useSettingsStore.getState().mouseSensitivity * zoomRatio;
+      controlsRef.current.pointerSpeed = liveSettings.mouseSensitivity * zoomRatio;
+    }
+
+    // Apply physical camera recoil climb & smooth spring decay
+    if (Math.abs(recoilPitchVel.current) > 0.0002) {
+      euler.setFromQuaternion(camera.quaternion, "YXZ");
+      euler.x = THREE.MathUtils.clamp(
+        euler.x + recoilPitchVel.current * dt * 14,
+        -Math.PI / 2 + 0.05,
+        Math.PI / 2 - 0.05,
+      );
+      camera.quaternion.setFromEuler(euler);
+      recoilPitchVel.current = THREE.MathUtils.damp(recoilPitchVel.current, 0, 18, dt);
     }
 
     // Apply mobile touch look deltas cleanly scaled to current optical zoom
@@ -352,9 +476,16 @@ const LocalPlayer = () => {
       touchInputState.lookPitchDelta = 0;
     }
 
-    const eyeOffset = movementState.crouch
-      ? PLAYER_CONFIG.CROUCH_EYE_OFFSET
-      : PLAYER_CONFIG.EYE_LEVEL_OFFSET;
+    // Expire tactical slide timer cleanly
+    if (movementState.isSliding && nowEpoch >= movementState.slideUntil) {
+      movementState.isSliding = false;
+    }
+
+    const eyeOffset = movementState.isSliding
+      ? PLAYER_CONFIG.SLIDE_EYE_OFFSET
+      : movementState.crouch
+        ? PLAYER_CONFIG.CROUCH_EYE_OFFSET
+        : PLAYER_CONFIG.EYE_LEVEL_OFFSET;
 
     if (curMe) {
       const dist = Math.hypot(
@@ -378,13 +509,14 @@ const LocalPlayer = () => {
 
     const targetFov = combatState.isAiming
       ? baseFov / (wpnStats.adsZoom || 1.45)
-      : baseFov;
+      : movementState.isSliding
+        ? baseFov + 7
+        : baseFov;
+    const fovDamp = combatState.isAiming ? 18 * wpnStats.adsSpeedMult : 14;
     if (Math.abs(camera.fov - targetFov) > 0.01) {
-      camera.fov = THREE.MathUtils.damp(camera.fov, targetFov, 18, dt);
+      camera.fov = THREE.MathUtils.damp(camera.fov, targetFov, fovDamp, dt);
       camera.updateProjectionMatrix();
     }
-
-    const liveSettings = useSettingsStore.getState();
 
     // Combine keyboard + touch joystick movement
     const keyForward =
@@ -392,9 +524,10 @@ const LocalPlayer = () => {
     const keyRight = (movementState.left ? 1 : 0) - (movementState.right ? 1 : 0);
     const forward = THREE.MathUtils.clamp(keyForward + touchInputState.moveY, -1, 1);
     const right = THREE.MathUtils.clamp(keyRight - touchInputState.moveX, -1, 1);
-    const isMoving = Math.hypot(forward, right) > 0.05;
+    const isMoving = Math.hypot(forward, right) > 0.05 || movementState.isSliding;
     const autoSprintEngaged = liveSettings.autoSprint && forward > 0.45;
     const effectiveSprint =
+      !movementState.isSliding &&
       (movementState.sprint || touchInputState.sprintActive || autoSprintEngaged) &&
       !movementState.crouch &&
       !combatState.isAiming;
@@ -403,16 +536,27 @@ const LocalPlayer = () => {
       combatState.isAiming = false;
     }
 
-    // Desired horizontal velocity fed into Cannon-es rigid body
+    // Reset lean automatically when sprinting
+    if (effectiveSprint && movementState.lean !== 0) {
+      movementState.lean = 0;
+    }
+
     let targetVx = 0;
     let targetVz = 0;
+    const isOverdrive = gameStoreState.overdriveUntil > nowEpoch;
+    const overdriveSpeedMult = isOverdrive ? 1.18 : 1.0;
 
-    if (isMoving && (!curMe || !curMe.isDead)) {
+    if (movementState.isSliding && (!curMe || !curMe.isDead)) {
+      const slideRemaining = Math.max(0, (movementState.slideUntil - nowEpoch) / PHYSICS_CONFIG.SLIDE_DURATION_MS);
+      const slideSpeed = PHYSICS_CONFIG.SLIDE_SPEED * (0.55 + slideRemaining * 0.65) * overdriveSpeedMult;
+      targetVx = movementState.slideDirX * slideSpeed;
+      targetVz = movementState.slideDirZ * slideSpeed;
+    } else if (isMoving && (!curMe || !curMe.isDead)) {
       const charCfg = curMe
         ? CHARACTERS[curMe.characterId] || CHARACTERS.striker
         : CHARACTERS.striker;
       const aimPenalty = combatState.isAiming ? 0.72 : 1.0;
-      const isDashing = curMe?.dashUntil && curMe.dashUntil > Date.now();
+      const isDashing = curMe?.dashUntil && curMe.dashUntil > nowEpoch;
 
       let baseSpeed = movementState.crouch
         ? PHYSICS_CONFIG.CROUCH_SPEED
@@ -430,6 +574,7 @@ const LocalPlayer = () => {
         charCfg.speedMult *
         wpnStats.moveSpeedMult *
         aimPenalty *
+        overdriveSpeedMult *
         moveStrength;
 
       camera.getWorldDirection(frontVector.current);
@@ -453,23 +598,22 @@ const LocalPlayer = () => {
 
       currentSpread.current = Math.min(
         currentSpread.current + dt * 28 * (movementState.crouch ? 0.65 : 1.0),
-        combatState.isAiming ? 7 : 16,
+        combatState.isAiming ? 6 : 15,
       );
       bobTime.current += dt;
 
       if (localGrounded.current && nowPerf >= nextStepAt.current) {
         soundEngine.playFootstep(effectiveSprint);
-        nextStepAt.current = nowPerf + (effectiveSprint ? 300 : 460);
+        nextStepAt.current = nowPerf + (effectiveSprint ? 290 : 450);
       }
     } else {
       bobTime.current = 0;
-      if (useSettingsStore.getState().sprintMode === "toggle" && !isMoving) {
+      if (liveSettings.sprintMode === "toggle" && !isMoving) {
         sprintToggled.current = false;
         movementState.sprint = false;
       }
     }
 
-    // Step Cannon-es physics world for gravity, wall/prop collisions, jump pads & stair glide
     if (!curMe || !curMe.isDead) {
       if (nowPerf > jumpPadHoldUntil.current) {
         for (const pad of map.jumpPads) {
@@ -516,14 +660,17 @@ const LocalPlayer = () => {
       playerPos.current.y = THREE.MathUtils.damp(
         playerPos.current.y,
         targetEyeY,
-        32,
+        30,
         dt,
       );
     }
 
-    euler.setFromQuaternion(camera.quaternion);
+    euler.setFromQuaternion(camera.quaternion, "YXZ");
     currentYaw.current = euler.y;
     currentPitch.current = euler.x;
+
+    // Smooth tactical Q/E lean offset
+    smoothLean.current = THREE.MathUtils.damp(smoothLean.current, movementState.lean, 14, dt);
 
     camera.getWorldDirection(camDir.current);
     const camRight = camRightRef.current
@@ -532,40 +679,46 @@ const LocalPlayer = () => {
     const camUp = camUpRef.current.crossVectors(camRight, camDir.current).normalize();
 
     const bobOffset =
-      isMoving && localGrounded.current
+      isMoving && !movementState.isSliding && localGrounded.current
         ? calculateHeadbobOffset(bobTime.current, effectiveSprint) * 0.72
         : 0;
 
+    const leanLateral = smoothLean.current * 0.42;
+
     if (perspective === "1p") {
       camera.position.set(
-        playerPos.current.x,
-        playerPos.current.y + bobOffset,
-        playerPos.current.z,
+        playerPos.current.x + camRight.x * leanLateral,
+        playerPos.current.y + bobOffset - Math.abs(smoothLean.current) * 0.08,
+        playerPos.current.z + camRight.z * leanLateral,
       );
       if (localCharGroupRef.current) {
         localCharGroupRef.current.visible = false;
       }
     } else {
       const eyeOrigin = eyeOriginRef.current.set(
-        playerPos.current.x,
+        playerPos.current.x + camRight.x * leanLateral,
         playerPos.current.y + (combatState.isAiming ? 0.14 : 0.2),
-        playerPos.current.z,
+        playerPos.current.z + camRight.z * leanLateral,
       );
 
       const shoulderSign = liveSettings.cameraShoulder === "left" ? -1 : 1;
       const shoulderRight =
         (combatState.isAiming ? 0.64 : 0.62) * shoulderSign;
       const baseDist = THREE.MathUtils.clamp(liveSettings.cameraDistance || 3.8, 2.4, 5.5);
-      const isScopedSniper = combatState.isAiming && activeWeaponId === "sniper";
-      const desiredBack = isScopedSniper
-        ? 0.25
+      const isMagnifiedScope =
+        combatState.isAiming &&
+        (activeAtt.scope === "prism_2x" ||
+          activeAtt.scope === "acog_4x" ||
+          activeAtt.scope === "sniper_8x");
+      const desiredBack = isMagnifiedScope
+        ? 0.22
         : combatState.isAiming
           ? Math.max(1.45, baseDist * 0.46)
           : baseDist;
 
       const desiredCamPos = desiredCamPosRef.current
         .copy(eyeOrigin)
-        .addScaledVector(camRight, isScopedSniper ? 0 : shoulderRight)
+        .addScaledVector(camRight, isMagnifiedScope ? 0 : shoulderRight)
         .addScaledVector(camDir.current, -desiredBack);
       desiredCamPos.y += combatState.isAiming ? 0.08 : 0.14;
 
@@ -584,11 +737,11 @@ const LocalPlayer = () => {
         map,
       );
 
-      const targetSafe = isScopedSniper ? 0.1 : Math.max(0.45, wallDist - 0.25);
+      const targetSafe = isMagnifiedScope ? 0.08 : Math.max(0.45, wallDist - 0.25);
       smoothCamDist.current = THREE.MathUtils.damp(
         smoothCamDist.current,
         targetSafe,
-        isScopedSniper ? 35 : 18,
+        isMagnifiedScope ? 35 : 18,
         dt,
       );
       camera.position
@@ -596,7 +749,7 @@ const LocalPlayer = () => {
         .addScaledVector(toCamNorm, smoothCamDist.current);
 
       if (localCharGroupRef.current) {
-        localCharGroupRef.current.visible = !curMe?.isDead && !isScopedSniper;
+        localCharGroupRef.current.visible = !curMe?.isDead && !isMagnifiedScope;
         localCharGroupRef.current.position.set(
           playerPos.current.x,
           localBodyY.current,
@@ -608,9 +761,9 @@ const LocalPlayer = () => {
 
     const fireShot = () => {
       const origin = shootOriginRef.current.set(
-        playerPos.current.x,
+        playerPos.current.x + camRight.x * leanLateral,
         playerPos.current.y,
-        playerPos.current.z,
+        playerPos.current.z + camRight.z * leanLateral,
       );
       const shootDir = shootDirRef.current.copy(camDir.current);
 
@@ -640,7 +793,7 @@ const LocalPlayer = () => {
           camDir.current.x,
           camDir.current.y,
           camDir.current.z,
-          140,
+          160,
           map,
         );
         const targetPt = shootTargetRef.current
@@ -673,7 +826,19 @@ const LocalPlayer = () => {
         channel.emit("shoot", payload);
       }
 
-      // Apply physical impulse to nearby dynamic Cannon-es crates & barrels along shot line
+      // Eject spinning 3D brass shell casing to the right & slightly up
+      useGameStore.getState().addShellCasing({
+        id: Math.random().toString(36).slice(2),
+        x: muzzleWorld.x - camDir.current.x * 0.28 + camRight.x * 0.08,
+        y: muzzleWorld.y - 0.04,
+        z: muzzleWorld.z - camDir.current.z * 0.28 + camRight.z * 0.08,
+        vx: camRight.x * (2.2 + Math.random() * 0.9) - camDir.current.x * 0.4,
+        vy: 1.55 + Math.random() * 0.65,
+        vz: camRight.z * (2.2 + Math.random() * 0.9) - camDir.current.z * 0.4,
+        isShotgun: activeWeaponId === "shotgun",
+        createdAt: Date.now(),
+      });
+
       arenaPhysics.applyShotImpulse(
         origin.x,
         origin.y,
@@ -681,36 +846,39 @@ const LocalPlayer = () => {
         shootDir.x,
         shootDir.y,
         shootDir.z,
-        46,
+        48,
       );
 
-      const crouchMult = movementState.crouch ? 0.72 : 1.0;
-      const aimMult = combatState.isAiming ? 0.74 : 1.0;
+      const crouchMult = movementState.crouch || movementState.isSliding ? 0.68 : 1.0;
+      const aimMult = combatState.isAiming ? 0.72 : 1.0;
+      const effKick = wpnStats.recoilKick * crouchMult * aimMult;
+      recoilPitchVel.current += effKick * 0.085;
+
       window.dispatchEvent(
         new CustomEvent("weapon-fired", {
-          detail: { kick: wpnStats.recoilKick * crouchMult * aimMult },
+          detail: { kick: effKick },
         }),
       );
     };
 
     if (curMe && !curMe.isDead && !curMe.isReloading && curMe.ammo > 0) {
       const shotSpreadGain =
-        14 *
-        (combatState.isAiming ? 0.45 : 1.0) *
-        (movementState.crouch ? 0.72 : 1.0);
+        13 *
+        (combatState.isAiming ? 0.42 : 1.0) *
+        (movementState.crouch || movementState.isSliding ? 0.7 : 1.0);
       if (burstShotsLeft.current > 0) {
         if (nowPerf - lastShotClient.current >= wpnStats.fireRate) {
           fireShot();
           lastShotClient.current = nowPerf;
           burstShotsLeft.current -= 1;
-          currentSpread.current = Math.min(currentSpread.current + shotSpreadGain, 42);
+          currentSpread.current = Math.min(currentSpread.current + shotSpreadGain, 40);
         }
       } else if (combatState.isShooting) {
         if (nowPerf - lastShotClient.current >= wpnStats.fireRate) {
           if (wpnStats.mode === "auto" || triggerReady.current) {
             fireShot();
             lastShotClient.current = nowPerf;
-            currentSpread.current = Math.min(currentSpread.current + shotSpreadGain, 42);
+            currentSpread.current = Math.min(currentSpread.current + shotSpreadGain, 40);
 
             if (wpnStats.mode === "burst") {
               burstShotsLeft.current = Math.min(3, curMe.ammo) - 1;
@@ -743,6 +911,8 @@ const LocalPlayer = () => {
         pitch: currentPitch.current,
         isCrouching: movementState.crouch,
         isSprinting: effectiveSprint,
+        isSliding: movementState.isSliding,
+        lean: smoothLean.current,
         isMoving,
         isGrounded: localGrounded.current,
         moveForward,
@@ -770,6 +940,9 @@ const LocalPlayer = () => {
     }
   });
 
+  const meWeapon: WeaponId = me?.currentWeapon || "assaultRifle";
+  const meAttachments = allAttachments[meWeapon] || getDefaultAttachments(meWeapon);
+
   return (
     <>
       <PointerLockControls
@@ -787,11 +960,14 @@ const LocalPlayer = () => {
               characterId={me.characterId || "striker"}
               skinId={me.skinId || sessionSkin}
               team={me.team}
-              weaponId={me.currentWeapon || "assaultRifle"}
+              weaponId={meWeapon}
+              weaponAttachments={meAttachments}
               pitch={me.pitch || 0}
               isMoving={me.isMoving}
               isSprinting={me.isSprinting}
               isCrouching={me.isCrouching}
+              isSliding={me.isSliding}
+              lean={me.lean || 0}
               isReloading={me.isReloading}
               isGrounded={me.isGrounded ?? true}
               isAiming={combatState.isAiming}

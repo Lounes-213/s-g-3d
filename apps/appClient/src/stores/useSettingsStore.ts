@@ -1,11 +1,13 @@
 import { create } from "zustand";
 import {
   DEFAULT_KEYBINDINGS,
+  getDefaultAttachments,
   type KeyAction,
   type KeyBindingsMap,
   type PerspectiveMode,
   type SkinId,
   type ThemeMode,
+  type WeaponAttachments,
   type WeaponId,
 } from "@block-shooter/shared";
 
@@ -17,7 +19,122 @@ export type CrosshairStyle = "tactical" | "dot" | "cross" | "circle";
 export type GraphicsQuality = "low" | "medium" | "high";
 export type MobileControlsMode = "auto" | "on" | "off";
 
-const STORAGE_KEY = "sg3d_settings_v2";
+export type MobileControlId =
+  | "joystick"
+  | "fireRight"
+  | "fireLeft"
+  | "ads"
+  | "jump"
+  | "crouch"
+  | "reload"
+  | "loot"
+  | "armorPlate"
+  | "medkit"
+  | "scopeCycle"
+  | "leanLeft"
+  | "leanRight"
+  | "skill1"
+  | "skill2"
+  | "skill3"
+  | "camera"
+  | "weaponsBar";
+
+export interface MobileControlLayout {
+  x: number; // viewport % (0..100)
+  y: number; // viewport % (0..100)
+  scale: number; // 0.6..1.6
+  opacity: number; // 0.3..1.0
+  visible: boolean;
+}
+
+export type MobileHudLayoutMap = Record<MobileControlId, MobileControlLayout>;
+export type MobilePresetId = "thumb2" | "claw3" | "claw4" | "custom";
+
+export const MOBILE_CONTROL_LABELS: Record<MobileControlId, string> = {
+  joystick: "Move Joystick",
+  fireRight: "Primary Fire (R)",
+  fireLeft: "Secondary Fire (L)",
+  ads: "Scope / ADS",
+  jump: "Jump",
+  crouch: "Crouch / Slide",
+  reload: "Reload",
+  loot: "Loot Pickup",
+  armorPlate: "Armor Plate",
+  medkit: "Medkit",
+  scopeCycle: "Cycle Zoom",
+  leanLeft: "Lean Left",
+  leanRight: "Lean Right",
+  skill1: "Dash Skill",
+  skill2: "Shield Skill",
+  skill3: "Frag Grenade",
+  camera: "1P / 3P Cam",
+  weaponsBar: "Weapon Slots",
+};
+
+export const MOBILE_HUD_PRESETS: Record<Exclude<MobilePresetId, "custom">, MobileHudLayoutMap> = {
+  thumb2: {
+    joystick: { x: 14, y: 74, scale: 1.0, opacity: 0.88, visible: true },
+    fireRight: { x: 87, y: 69, scale: 1.05, opacity: 0.92, visible: true },
+    fireLeft: { x: 14, y: 45, scale: 0.9, opacity: 0.8, visible: true },
+    ads: { x: 76, y: 55, scale: 1.0, opacity: 0.9, visible: true },
+    jump: { x: 92, y: 49, scale: 0.95, opacity: 0.88, visible: true },
+    crouch: { x: 75, y: 78, scale: 0.95, opacity: 0.88, visible: true },
+    reload: { x: 65, y: 80, scale: 0.9, opacity: 0.88, visible: true },
+    loot: { x: 50, y: 68, scale: 1.0, opacity: 0.96, visible: true },
+    armorPlate: { x: 32, y: 84, scale: 0.88, opacity: 0.88, visible: true },
+    medkit: { x: 25, y: 84, scale: 0.88, opacity: 0.88, visible: true },
+    scopeCycle: { x: 84, y: 36, scale: 0.85, opacity: 0.86, visible: true },
+    leanLeft: { x: 22, y: 55, scale: 0.82, opacity: 0.82, visible: true },
+    leanRight: { x: 30, y: 55, scale: 0.82, opacity: 0.82, visible: true },
+    skill1: { x: 82, y: 24, scale: 0.82, opacity: 0.84, visible: true },
+    skill2: { x: 90, y: 24, scale: 0.82, opacity: 0.84, visible: true },
+    skill3: { x: 94, y: 35, scale: 0.82, opacity: 0.84, visible: true },
+    camera: { x: 93, y: 12, scale: 0.82, opacity: 0.84, visible: true },
+    weaponsBar: { x: 50, y: 92, scale: 0.95, opacity: 0.92, visible: true },
+  },
+  claw3: {
+    joystick: { x: 14, y: 74, scale: 1.0, opacity: 0.88, visible: true },
+    fireLeft: { x: 14, y: 24, scale: 1.15, opacity: 0.94, visible: true },
+    fireRight: { x: 88, y: 72, scale: 0.92, opacity: 0.8, visible: true },
+    ads: { x: 88, y: 48, scale: 1.05, opacity: 0.92, visible: true },
+    jump: { x: 77, y: 58, scale: 0.98, opacity: 0.9, visible: true },
+    crouch: { x: 77, y: 75, scale: 0.98, opacity: 0.9, visible: true },
+    reload: { x: 66, y: 79, scale: 0.9, opacity: 0.88, visible: true },
+    loot: { x: 50, y: 66, scale: 1.0, opacity: 0.96, visible: true },
+    armorPlate: { x: 32, y: 83, scale: 0.88, opacity: 0.88, visible: true },
+    medkit: { x: 25, y: 83, scale: 0.88, opacity: 0.88, visible: true },
+    scopeCycle: { x: 78, y: 38, scale: 0.88, opacity: 0.88, visible: true },
+    leanLeft: { x: 24, y: 36, scale: 0.86, opacity: 0.86, visible: true },
+    leanRight: { x: 32, y: 36, scale: 0.86, opacity: 0.86, visible: true },
+    skill1: { x: 68, y: 24, scale: 0.82, opacity: 0.84, visible: true },
+    skill2: { x: 76, y: 24, scale: 0.82, opacity: 0.84, visible: true },
+    skill3: { x: 84, y: 24, scale: 0.82, opacity: 0.84, visible: true },
+    camera: { x: 93, y: 12, scale: 0.82, opacity: 0.84, visible: true },
+    weaponsBar: { x: 50, y: 92, scale: 0.95, opacity: 0.92, visible: true },
+  },
+  claw4: {
+    joystick: { x: 14, y: 75, scale: 1.0, opacity: 0.86, visible: true },
+    fireLeft: { x: 13, y: 22, scale: 1.2, opacity: 0.94, visible: true },
+    fireRight: { x: 89, y: 76, scale: 0.85, opacity: 0.65, visible: false },
+    ads: { x: 87, y: 22, scale: 1.15, opacity: 0.94, visible: true },
+    jump: { x: 77, y: 25, scale: 0.96, opacity: 0.9, visible: true },
+    crouch: { x: 89, y: 40, scale: 0.98, opacity: 0.9, visible: true },
+    reload: { x: 78, y: 78, scale: 0.92, opacity: 0.88, visible: true },
+    loot: { x: 50, y: 66, scale: 1.0, opacity: 0.96, visible: true },
+    armorPlate: { x: 32, y: 82, scale: 0.88, opacity: 0.88, visible: true },
+    medkit: { x: 25, y: 82, scale: 0.88, opacity: 0.88, visible: true },
+    scopeCycle: { x: 77, y: 39, scale: 0.88, opacity: 0.88, visible: true },
+    leanLeft: { x: 24, y: 24, scale: 0.92, opacity: 0.88, visible: true },
+    leanRight: { x: 32, y: 24, scale: 0.92, opacity: 0.88, visible: true },
+    skill1: { x: 88, y: 56, scale: 0.84, opacity: 0.84, visible: true },
+    skill2: { x: 88, y: 68, scale: 0.84, opacity: 0.84, visible: true },
+    skill3: { x: 78, y: 62, scale: 0.84, opacity: 0.84, visible: true },
+    camera: { x: 68, y: 14, scale: 0.82, opacity: 0.84, visible: true },
+    weaponsBar: { x: 50, y: 92, scale: 0.95, opacity: 0.92, visible: true },
+  },
+};
+
+const STORAGE_KEY = "sg3d_settings_v3";
 
 interface PersistedSettings {
   keybindings: KeyBindingsMap;
@@ -42,11 +159,27 @@ interface PersistedSettings {
   graphicsQuality: GraphicsQuality;
   mobileControlsMode: MobileControlsMode;
   voicePttMode: boolean;
+  weaponAttachments: Partial<Record<WeaponId, WeaponAttachments>>;
+  mobileHudPreset: MobilePresetId;
+  mobileHudLayout: MobileHudLayoutMap;
+}
+
+function mergeMobileLayout(saved?: Partial<MobileHudLayoutMap>): MobileHudLayoutMap {
+  const base = MOBILE_HUD_PRESETS.thumb2;
+  const out = { ...base };
+  if (saved) {
+    (Object.keys(base) as MobileControlId[]).forEach((k) => {
+      if (saved[k]) {
+        out[k] = { ...base[k], ...saved[k] };
+      }
+    });
+  }
+  return out;
 }
 
 function loadInitialSettings(): PersistedSettings {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("sg3d_settings_v2");
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
@@ -54,15 +187,15 @@ function loadInitialSettings(): PersistedSettings {
         perspective: parsed.perspective === "1p" ? "1p" : "3p",
         mouseSensitivity:
           typeof parsed.mouseSensitivity === "number" ? parsed.mouseSensitivity : 1.0,
-        fov: typeof parsed.fov === "number" ? parsed.fov : 74,
+        fov: typeof parsed.fov === "number" ? parsed.fov : 76,
         masterVolume:
-          typeof parsed.masterVolume === "number" ? parsed.masterVolume : 0.8,
+          typeof parsed.masterVolume === "number" ? parsed.masterVolume : 0.85,
         soundPack:
           parsed.soundPack === "scifi" || parsed.soundPack === "classic"
             ? parsed.soundPack
             : "tactical",
         playerName: typeof parsed.playerName === "string" ? parsed.playerName : "",
-        theme: parsed.theme === "dark" ? "dark" : "light",
+        theme: parsed.theme === "light" ? "light" : "dark",
         skinId: typeof parsed.skinId === "string" ? parsed.skinId : "urban_ops",
         sprintMode: parsed.sprintMode === "toggle" ? "toggle" : "hold",
         adsMode: parsed.adsMode === "toggle" ? "toggle" : "hold",
@@ -74,7 +207,7 @@ function loadInitialSettings(): PersistedSettings {
         cameraDistance:
           typeof parsed.cameraDistance === "number"
             ? Math.min(5.5, Math.max(2.4, parsed.cameraDistance))
-            : 3.8,
+            : 3.7,
         crosshairStyle:
           parsed.crosshairStyle === "dot" ||
           parsed.crosshairStyle === "cross" ||
@@ -82,18 +215,29 @@ function loadInitialSettings(): PersistedSettings {
             ? parsed.crosshairStyle
             : "tactical",
         crosshairColor:
-          typeof parsed.crosshairColor === "string" ? parsed.crosshairColor : "#67e8f9",
+          typeof parsed.crosshairColor === "string" ? parsed.crosshairColor : "#f59e0b",
         showDamageNumbers:
           typeof parsed.showDamageNumbers === "boolean" ? parsed.showDamageNumbers : true,
         graphicsQuality:
           parsed.graphicsQuality === "low" || parsed.graphicsQuality === "high"
             ? parsed.graphicsQuality
-            : "medium",
+            : "high",
         mobileControlsMode:
           parsed.mobileControlsMode === "on" || parsed.mobileControlsMode === "off"
             ? parsed.mobileControlsMode
             : "auto",
         voicePttMode: Boolean(parsed.voicePttMode),
+        weaponAttachments:
+          parsed.weaponAttachments && typeof parsed.weaponAttachments === "object"
+            ? parsed.weaponAttachments
+            : {},
+        mobileHudPreset:
+          parsed.mobileHudPreset === "claw3" ||
+          parsed.mobileHudPreset === "claw4" ||
+          parsed.mobileHudPreset === "custom"
+            ? parsed.mobileHudPreset
+            : "thumb2",
+        mobileHudLayout: mergeMobileLayout(parsed.mobileHudLayout),
       };
     }
   } catch {
@@ -103,11 +247,11 @@ function loadInitialSettings(): PersistedSettings {
     keybindings: { ...DEFAULT_KEYBINDINGS },
     perspective: "3p",
     mouseSensitivity: 1.0,
-    fov: 74,
-    masterVolume: 0.8,
+    fov: 76,
+    masterVolume: 0.85,
     soundPack: "tactical",
     playerName: "",
-    theme: "light",
+    theme: "dark",
     skinId: "urban_ops",
     sprintMode: "hold",
     adsMode: "hold",
@@ -115,13 +259,16 @@ function loadInitialSettings(): PersistedSettings {
     autoReload: true,
     hideWeaponOnAds: true,
     cameraShoulder: "right",
-    cameraDistance: 3.8,
+    cameraDistance: 3.7,
     crosshairStyle: "tactical",
-    crosshairColor: "#67e8f9",
+    crosshairColor: "#f59e0b",
     showDamageNumbers: true,
-    graphicsQuality: "medium",
+    graphicsQuality: "high",
     mobileControlsMode: "auto",
     voicePttMode: false,
+    weaponAttachments: {},
+    mobileHudPreset: "thumb2",
+    mobileHudLayout: mergeMobileLayout(),
   };
 }
 
@@ -160,6 +307,16 @@ export interface SettingsStore extends PersistedSettings {
   setGraphicsQuality: (q: GraphicsQuality) => void;
   setMobileControlsMode: (mode: MobileControlsMode) => void;
   setVoicePttMode: (ptt: boolean) => void;
+  getWeaponAttachments: (weaponId: WeaponId) => WeaponAttachments;
+  setWeaponAttachment: <K extends keyof WeaponAttachments>(
+    weaponId: WeaponId,
+    slot: K,
+    value: WeaponAttachments[K],
+  ) => void;
+  resetWeaponAttachments: (weaponId: WeaponId) => void;
+  updateMobileControl: (id: MobileControlId, patch: Partial<MobileControlLayout>) => void;
+  applyMobilePreset: (preset: Exclude<MobilePresetId, "custom">) => void;
+  resetMobileHudLayout: () => void;
   setCustomWeaponSound: (weaponId: WeaponId, name: string, dataUrl: string) => void;
   clearCustomWeaponSound: (weaponId: WeaponId) => void;
 }
@@ -190,6 +347,9 @@ function persistSnapshot(s: SettingsStore): PersistedSettings {
     graphicsQuality: s.graphicsQuality,
     mobileControlsMode: s.mobileControlsMode,
     voicePttMode: s.voicePttMode,
+    weaponAttachments: s.weaponAttachments,
+    mobileHudPreset: s.mobileHudPreset,
+    mobileHudLayout: s.mobileHudLayout,
   };
 }
 
@@ -347,6 +507,66 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       saveSettings(persistSnapshot({ ...state, voicePttMode }));
       return { voicePttMode };
     }),
+
+  getWeaponAttachments: (weaponId) => {
+    const saved = get().weaponAttachments[weaponId];
+    return { ...getDefaultAttachments(weaponId), ...(saved || {}) };
+  },
+
+  setWeaponAttachment: (weaponId, slot, value) =>
+    set((state) => {
+      const current = {
+        ...getDefaultAttachments(weaponId),
+        ...(state.weaponAttachments[weaponId] || {}),
+      };
+      const nextMap = {
+        ...state.weaponAttachments,
+        [weaponId]: { ...current, [slot]: value },
+      };
+      saveSettings(persistSnapshot({ ...state, weaponAttachments: nextMap }));
+      return { weaponAttachments: nextMap };
+    }),
+
+  resetWeaponAttachments: (weaponId) =>
+    set((state) => {
+      const nextMap = { ...state.weaponAttachments };
+      delete nextMap[weaponId];
+      saveSettings(persistSnapshot({ ...state, weaponAttachments: nextMap }));
+      return { weaponAttachments: nextMap };
+    }),
+
+  updateMobileControl: (id, patch) =>
+    set((state) => {
+      const nextLayout: MobileHudLayoutMap = {
+        ...state.mobileHudLayout,
+        [id]: { ...state.mobileHudLayout[id], ...patch },
+      };
+      saveSettings(
+        persistSnapshot({
+          ...state,
+          mobileHudPreset: "custom",
+          mobileHudLayout: nextLayout,
+        }),
+      );
+      return { mobileHudPreset: "custom", mobileHudLayout: nextLayout };
+    }),
+
+  applyMobilePreset: (preset) =>
+    set((state) => {
+      const nextLayout = mergeMobileLayout(MOBILE_HUD_PRESETS[preset]);
+      saveSettings(
+        persistSnapshot({
+          ...state,
+          mobileHudPreset: preset,
+          mobileHudLayout: nextLayout,
+        }),
+      );
+      return { mobileHudPreset: preset, mobileHudLayout: nextLayout };
+    }),
+
+  resetMobileHudLayout: () => {
+    get().applyMobilePreset("thumb2");
+  },
 
   setCustomWeaponSound: (weaponId, name, dataUrl) =>
     set((state) => ({

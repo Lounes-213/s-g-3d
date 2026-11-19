@@ -14,6 +14,7 @@ import {
   Moon,
 } from "lucide-react";
 import { useAppStore } from "../stores/useAppStore";
+import { useGameStore } from "../stores/useGameStore";
 import {
   useSettingsStore,
   type AdsMode,
@@ -361,14 +362,14 @@ const SideBar = () => {
                   <div className="text-xs font-black uppercase tracking-wider mb-1.5">
                     Mobile Touch Controls
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1.5 mb-2">
                     {(["auto", "on", "off"] as MobileControlsMode[]).map((m) => (
                       <button
                         key={m}
                         onClick={() => setMobileControlsMode(m)}
                         className={`py-1.5 text-[11px] font-black uppercase border cursor-pointer ${
                           mobileControlsMode === m
-                            ? "bg-sky-600 border-sky-500 text-white"
+                            ? "bg-amber-500 border-amber-400 text-slate-950"
                             : isLight
                               ? "bg-white border-slate-300"
                               : "bg-slate-900 border-white/10 text-slate-400"
@@ -378,6 +379,17 @@ const SideBar = () => {
                       </button>
                     ))}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      toggleSidebar();
+                      useGameStore.getState().setMobileHudEditorOpen(true);
+                    }}
+                    className="w-full py-2 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider cursor-pointer"
+                  >
+                    Customize Mobile HUD Buttons (Drag & Resize)
+                  </button>
                 </div>
               </div>
 

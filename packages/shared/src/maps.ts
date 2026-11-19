@@ -45,7 +45,13 @@ export type MapPropKind =
   | "ph_propane"
   | "ph_rock_moss"
   | "ph_tyre"
-  | "ph_utility_box";
+  | "ph_utility_box"
+  | "watchtower"
+  | "gas_canopy"
+  | "palm_tree"
+  | "boulder_cluster"
+  | "billboard"
+  | "heli_pad";
 
 export interface MapProp {
   id: string;
@@ -1386,7 +1392,274 @@ function buildCrimsonFoundryMap(): MapData {
   };
 }
 
+function buildVerdantRoyaleMap(): MapData {
+  const floorW = 280;
+  const floorD = 280;
+  const structures: MapBox[] = [
+    // Main East-West 4-Lane Asphalt Highway & Cross-Highway
+    { name: "br_hwy_ew", x: 0, y: 0.03, z: 0, width: 274, height: 0.06, depth: 18, material: "asphalt" },
+    { name: "br_hwy_ns", x: 0, y: 0.03, z: 0, width: 18, height: 0.06, depth: 274, material: "asphalt" },
+    // Secondary ring avenues connecting POIs
+    { name: "br_ave_north", x: -58, y: 0.03, z: -64, width: 112, height: 0.06, depth: 11, material: "asphalt" },
+    { name: "br_ave_airfield", x: 76, y: 0.03, z: -48, width: 92, height: 0.06, depth: 30, material: "asphalt" },
+    { name: "br_plaza_sw", x: -64, y: 0.03, z: 62, width: 52, height: 0.06, depth: 44, material: "concrete" },
+    { name: "br_depot_se", x: 66, y: 0.03, z: 66, width: 64, height: 0.06, depth: 52, material: "concrete" },
+
+    // Highway median concrete dividers (realistic road cover)
+    { name: "br_med_w1", x: -42, y: 0.55, z: 0, width: 18, height: 1.1, depth: 0.7, material: "concrete" },
+    { name: "br_med_w2", x: -94, y: 0.55, z: 0, width: 22, height: 1.1, depth: 0.7, material: "concrete" },
+    { name: "br_med_e1", x: 42, y: 0.55, z: 0, width: 18, height: 1.1, depth: 0.7, material: "concrete" },
+    { name: "br_med_e2", x: 94, y: 0.55, z: 0, width: 22, height: 1.1, depth: 0.7, material: "concrete" },
+    { name: "br_med_n1", x: 0, y: 0.55, z: -44, width: 0.7, height: 1.1, depth: 20, material: "concrete" },
+    { name: "br_med_s1", x: 0, y: 0.55, z: 44, width: 0.7, height: 1.1, depth: 20, material: "concrete" },
+
+    // Central Highway Overpass Bridge & Sniper Walkways
+    { name: "br_overpass_deck", x: 0, y: 4.8, z: -16, width: 32, height: 0.55, depth: 7.2, material: "concrete" },
+    { name: "br_overpass_p1", x: -13, y: 2.3, z: -16, width: 1.6, height: 4.6, depth: 5.2, material: "concrete" },
+    { name: "br_overpass_p2", x: 13, y: 2.3, z: -16, width: 1.6, height: 4.6, depth: 5.2, material: "concrete" },
+    { name: "br_overpass_rail_n", x: 0, y: 5.55, z: -19.3, width: 32, height: 1.0, depth: 0.45, material: "metal_dark" },
+    { name: "br_overpass_rail_s", x: 0, y: 5.55, z: -12.7, width: 32, height: 1.0, depth: 0.45, material: "metal_dark" },
+    ...createStairs("br_op_w", -16, -16, -1, 0, 4.4, 9.5, 4.6, 10, "concrete"),
+    ...createStairs("br_op_e", 16, -16, 1, 0, 4.4, 9.5, 4.6, 10, "concrete"),
+
+    // Airfield Hangar (Walkable open-front military hangar, East POI)
+    { name: "br_hangar_slab", x: 84, y: 0.14, z: -52, width: 32, height: 0.28, depth: 22, material: "concrete" },
+    { name: "br_hangar_back", x: 99.6, y: 4.6, z: -52, width: 0.8, height: 9.0, depth: 22, material: "metal_dark" },
+    { name: "br_hangar_north", x: 84, y: 4.6, z: -62.6, width: 32, height: 9.0, depth: 0.8, material: "metal_dark" },
+    { name: "br_hangar_south", x: 84, y: 4.6, z: -41.4, width: 32, height: 9.0, depth: 0.8, material: "metal_dark" },
+    { name: "br_hangar_roof", x: 84, y: 9.3, z: -52, width: 32.8, height: 0.6, depth: 22.8, material: "container_blue" },
+    { name: "br_hangar_catwalk", x: 94, y: 4.4, z: -52, width: 8.5, height: 0.45, depth: 20, material: "metal_dark" },
+    ...createStairs("br_hangar_st", 89.5, -45, 0, -1, 3.2, 8.2, 4.3, 9, "metal_dark"),
+
+    // Industrial Cargo Depot Containers (SE POI)
+    { name: "br_cont_1", x: 52, y: 1.8, z: 54, width: 4.4, height: 3.6, depth: 11, material: "container_red" },
+    { name: "br_cont_2", x: 64, y: 1.8, z: 52, width: 11, height: 3.6, depth: 4.4, material: "container_blue" },
+    { name: "br_cont_3", x: 78, y: 1.8, z: 62, width: 4.4, height: 3.6, depth: 12, material: "crate_orange" },
+    { name: "br_cont_4", x: 78, y: 5.4, z: 62, width: 4.4, height: 3.6, depth: 10, material: "container_blue" },
+    { name: "br_cont_5", x: 56, y: 1.8, z: 78, width: 12, height: 3.6, depth: 4.4, material: "container_red" },
+    ...createStairs("br_depot_st", 71, 62, 1, 0, 3.0, 5.5, 3.6, 8, "metal_dark"),
+
+    // Elevated Sniper Ridges (North & South-East hills)
+    { name: "br_ridge_n_base", x: 26, y: 1.6, z: -96, width: 34, height: 3.2, depth: 24, material: "grass_terrain" },
+    { name: "br_ridge_n_top", x: 26, y: 4.0, z: -98, width: 18, height: 1.8, depth: 14, material: "stone_sand" },
+    ...createStairs("br_ridge_n_ramp", 9, -96, -1, 0, 6.5, 10, 3.2, 8, "stone_sand"),
+
+    { name: "br_ridge_s_base", x: -24, y: 1.5, z: 98, width: 32, height: 3.0, depth: 22, material: "grass_terrain" },
+    ...createStairs("br_ridge_s_ramp", -8, 98, 1, 0, 6.0, 9.0, 3.0, 8, "stone_sand"),
+  ];
+
+  // 8 Realistic Walkable Multi-Story Villas, Houses, Gas Station Shop & Outposts
+  const houses = [
+    // Downtown Metro Villas (NW)
+    buildWalkableHouse({ id: "br_villa_nw1", x: -52, z: -42, width: 15, depth: 13, wallHeight: 4.6, wallMaterial: "plaster_wall", roofColor: "#7c2d12", twoStory: true }),
+    buildWalkableHouse({ id: "br_villa_nw2", x: -82, z: -46, width: 13, depth: 12, wallHeight: 4.3, wallMaterial: "brick_wall", roofColor: "#334155", twoStory: true }),
+    buildWalkableHouse({ id: "br_villa_nw3", x: -56, z: -84, width: 14, depth: 12, wallHeight: 4.4, wallMaterial: "plaster_wall", roofColor: "#9a3412", twoStory: false }),
+    // Highway Gas Station Convenience Store (SW)
+    buildWalkableHouse({ id: "br_gas_shop", x: -78, z: 68, width: 14, depth: 10, wallHeight: 4.0, wallMaterial: "concrete", roofColor: "#0f172a", twoStory: false }),
+    // Suburban Ranch House (SW)
+    buildWalkableHouse({ id: "br_ranch_sw", x: -42, z: 44, width: 13, depth: 12, wallHeight: 4.4, wallMaterial: "brick_wall", roofColor: "#475569", twoStory: true }),
+    // Depot Command Office (SE)
+    buildWalkableHouse({ id: "br_office_se", x: 74, z: 86, width: 14, depth: 12, wallHeight: 4.5, wallMaterial: "concrete", roofColor: "#1e293b", twoStory: true }),
+    // Northern Forest Cabin
+    buildWalkableHouse({ id: "br_cabin_n", x: -16, z: -94, width: 11, depth: 10, wallHeight: 3.9, wallMaterial: "wood_plank", roofColor: "#451a03", twoStory: false }),
+    // East Checkpoint House
+    buildWalkableHouse({ id: "br_check_e", x: 42, z: -26, width: 12, depth: 11, wallHeight: 4.2, wallMaterial: "plaster_wall", roofColor: "#78350f", twoStory: false }),
+  ];
+
+  const props: MapProp[] = [];
+  for (const h of houses) {
+    structures.push(...h.boxes);
+    props.push(h.prop);
+  }
+
+  // Rich GTA/BR realistic environment props: Gas canopy, Watchtowers, Helipad, Vehicles, Palm/Pine/Oak Trees, Boulders, Billboards, Lamps
+  props.push(
+    // Gas station canopy & billboards
+    { id: "br_gas_canopy", kind: "gas_canopy", x: -56, y: 0, z: 62, rotY: 0 },
+    { id: "br_billboard_1", kind: "billboard", x: -24, y: 0, z: -13, rotY: 0.15 },
+    { id: "br_billboard_2", kind: "billboard", x: 26, y: 0, z: 14, rotY: Math.PI + 0.1 },
+
+    // Military Watchtowers & Airfield Helipad
+    { id: "br_tower_nw", kind: "watchtower", x: -34, y: 0, z: -64, rotY: 0.4 },
+    { id: "br_tower_e", kind: "watchtower", x: 56, y: 0, z: -72, rotY: -0.7 },
+    { id: "br_tower_se", kind: "watchtower", x: 96, y: 0, z: 46, rotY: 2.2 },
+    { id: "br_tower_sw", kind: "watchtower", x: -96, y: 0, z: 24, rotY: 1.1 },
+    { id: "br_helipad", kind: "heli_pad", x: 50, y: 0.04, z: -52, rotY: 0 },
+
+    // Highway & POI Vehicles (Cars, SUVs, Military Trucks)
+    { id: "br_car_1", kind: "ph_car", x: -26, y: 0, z: 4.5, rotY: 1.48 },
+    { id: "br_car_2", kind: "vehicle_jeep", x: 22, y: 0, z: -4.8, rotY: -1.62 },
+    { id: "br_truck_1", kind: "vehicle_truck", x: 68, y: 0, z: -34, rotY: 0.5 },
+    { id: "br_truck_2", kind: "vehicle_truck", x: -64, y: 0, z: 4, rotY: 1.55 },
+    { id: "br_car_3", kind: "ph_car", x: -56, y: 0, z: 54, rotY: 0.1 },
+    { id: "br_car_4", kind: "vehicle_jeep", x: -66, y: 0, z: -64, rotY: 1.3 },
+    { id: "br_car_5", kind: "ph_car", x: 4, y: 0, z: 32, rotY: 0.15 },
+    { id: "br_car_6", kind: "vehicle_jeep", x: 46, y: 0, z: 72, rotY: -0.9 },
+    { id: "br_truck_3", kind: "vehicle_truck", x: 108, y: 0, z: -5, rotY: -1.5 },
+    { id: "br_car_7", kind: "ph_car", x: -102, y: 0, z: -20, rotY: 0.8 },
+
+    // Highway Streetlamps
+    { id: "br_lamp_1", kind: "streetlamp", x: -30, y: 0, z: -10.5, rotY: 0 },
+    { id: "br_lamp_2", kind: "streetlamp", x: -70, y: 0, z: -10.5, rotY: 0 },
+    { id: "br_lamp_3", kind: "streetlamp", x: 30, y: 0, z: 10.5, rotY: Math.PI },
+    { id: "br_lamp_4", kind: "streetlamp", x: 70, y: 0, z: 10.5, rotY: Math.PI },
+    { id: "br_lamp_5", kind: "streetlamp", x: 10.5, y: 0, z: -56, rotY: -Math.PI / 2 },
+    { id: "br_lamp_6", kind: "streetlamp", x: -10.5, y: 0, z: 56, rotY: Math.PI / 2 },
+
+    // Roadblocks, Jersey Barriers, Sandbags, Generators & Boulders
+    { id: "br_bar_1", kind: "jersey_barrier", x: -14, y: 0, z: 5, rotY: 0.2 },
+    { id: "br_bar_2", kind: "jersey_barrier", x: 14, y: 0, z: -5, rotY: -0.2 },
+    { id: "br_bar_3", kind: "jersey_barrier", x: 6, y: 0, z: 68, rotY: 1.57 },
+    { id: "br_bar_4", kind: "jersey_barrier", x: -6, y: 0, z: -68, rotY: 1.57 },
+    { id: "br_sb_1", kind: "sandbags", x: 42, y: 0, z: -42, rotY: 0.6 },
+    { id: "br_sb_2", kind: "sandbags", x: -38, y: 0, z: 26, rotY: -0.5 },
+    { id: "br_gen_1", kind: "ph_generator", x: 70, y: 0, z: -52, rotY: 0 },
+    { id: "br_gen_2", kind: "ph_generator", x: -68, y: 0, z: 76, rotY: 1.57 },
+    { id: "br_rock_1", kind: "boulder_cluster", x: 26, y: 4.8, z: -98, rotY: 0.3 },
+    { id: "br_rock_2", kind: "boulder_cluster", x: -94, y: 0, z: 86, rotY: 1.2 },
+    { id: "br_rock_3", kind: "boulder_cluster", x: 108, y: 0, z: 86, rotY: 2.1 },
+    { id: "br_rock_4", kind: "boulder_cluster", x: -112, y: 0, z: -88, rotY: 0.8 },
+    { id: "br_rock_5", kind: "boulder_cluster", x: 102, y: 0, z: -102, rotY: 1.7 },
+    { id: "br_rock_6", kind: "boulder_cluster", x: 16, y: 0, z: 104, rotY: 2.6 },
+
+    // Lush Palms along Boulevards + Pine & Oak Forests around Valley Perimeter
+    { id: "br_palm_1", kind: "palm_tree", x: -38, y: 0, z: -13, rotY: 0.4 },
+    { id: "br_palm_2", kind: "palm_tree", x: -62, y: 0, z: -13, rotY: 1.2 },
+    { id: "br_palm_3", kind: "palm_tree", x: -86, y: 0, z: -13, rotY: 2.1 },
+    { id: "br_palm_4", kind: "palm_tree", x: 38, y: 0, z: 13, rotY: 0.9 },
+    { id: "br_palm_5", kind: "palm_tree", x: 64, y: 0, z: 13, rotY: 1.8 },
+    { id: "br_palm_6", kind: "palm_tree", x: -46, y: 0, z: 62, rotY: 2.5 },
+    { id: "br_palm_7", kind: "palm_tree", x: 14, y: 0, z: 42, rotY: 0.6 },
+    { id: "br_palm_8", kind: "palm_tree", x: -14, y: 0, z: -42, rotY: 1.4 },
+
+    { id: "br_pine_1", kind: "tree_pine", x: -108, y: 0, z: -64, rotY: 0.2 },
+    { id: "br_pine_2", kind: "tree_pine", x: -116, y: 0, z: -38, rotY: 1.1 },
+    { id: "br_pine_3", kind: "tree_pine", x: -94, y: 0, z: -104, rotY: 0.7 },
+    { id: "br_pine_4", kind: "tree_pine", x: -42, y: 0, z: -112, rotY: 1.9 },
+    { id: "br_pine_5", kind: "tree_pine", x: 12, y: 0, z: -116, rotY: 2.4 },
+    { id: "br_pine_6", kind: "tree_pine", x: 68, y: 0, z: -106, rotY: 0.5 },
+    { id: "br_pine_7", kind: "tree_pine", x: 116, y: 0, z: -84, rotY: 1.3 },
+    { id: "br_pine_8", kind: "tree_pine", x: 118, y: 0, z: -24, rotY: 2.2 },
+    { id: "br_pine_9", kind: "tree_pine", x: 116, y: 0, z: 26, rotY: 0.8 },
+    { id: "br_pine_10", kind: "tree_pine", x: 108, y: 0, z: 108, rotY: 1.7 },
+    { id: "br_pine_11", kind: "tree_pine", x: 46, y: 0, z: 114, rotY: 2.8 },
+    { id: "br_pine_12", kind: "tree_pine", x: -6, y: 0, z: 116, rotY: 0.3 },
+    { id: "br_pine_13", kind: "tree_pine", x: -58, y: 0, z: 112, rotY: 1.5 },
+    { id: "br_pine_14", kind: "tree_pine", x: -112, y: 0, z: 98, rotY: 2.1 },
+    { id: "br_pine_15", kind: "tree_pine", x: -118, y: 0, z: 48, rotY: 0.9 },
+
+    { id: "br_oak_1", kind: "tree_oak", x: -24, y: 0, z: -52, rotY: 0.5 },
+    { id: "br_oak_2", kind: "tree_oak", x: -74, y: 0, z: -24, rotY: 1.3 },
+    { id: "br_oak_3", kind: "tree_oak", x: 24, y: 0, z: -48, rotY: 2.1 },
+    { id: "br_oak_4", kind: "tree_oak", x: 34, y: 0, z: 46, rotY: 0.8 },
+    { id: "br_oak_5", kind: "tree_oak", x: -26, y: 0, z: 68, rotY: 1.9 },
+    { id: "br_oak_6", kind: "tree_oak", x: 86, y: 0, z: 24, rotY: 2.6 },
+    { id: "br_oak_7", kind: "tree_oak", x: -94, y: 0, z: 46, rotY: 0.4 },
+    { id: "br_oak_8", kind: "tree_oak", x: 54, y: 0, z: -88, rotY: 1.1 },
+  );
+
+  return {
+    id: "royale_valley",
+    name: "Los Verdant Royale",
+    subtitle: "280m Open-World Battle Royale • Metro, Airfield & Highways",
+    skybox: "afternoon",
+    isDaylight: true,
+    fogColor: "#b7d5ea",
+    floorMaterial: "grass_terrain",
+    floor: { width: floorW, depth: floorD, thickness: 1, x: 0, y: -0.5, z: 0 },
+    walls: createPerimeterWalls(floorW, floorD, 16, 4, "stone_sand"),
+    structures,
+    props,
+    jumpPads: [
+      { id: "br_jp_center", x: 0, y: 0.15, z: 16, radius: 2.2, boostY: 23, color: "#f59e0b" },
+      { id: "br_jp_airfield", x: 64, y: 0.15, z: -52, radius: 2.2, boostY: 24, color: "#06b6d4" },
+      { id: "br_jp_villa", x: -66, y: 0.15, z: -44, radius: 2.2, boostY: 22, color: "#f59e0b" },
+      { id: "br_jp_depot", x: 64, y: 0.15, z: 68, radius: 2.2, boostY: 22, color: "#06b6d4" },
+    ],
+    captureZone: { x: 0, y: 0.15, z: 0, radius: 13.0 },
+    redSpawns: [
+      { x: -102, y: 1.2, z: -32 },
+      { x: -96, y: 1.2, z: 32 },
+      { x: -84, y: 1.2, z: -76 },
+      { x: -84, y: 1.2, z: 82 },
+    ],
+    blueSpawns: [
+      { x: 102, y: 1.2, z: -32 },
+      { x: 96, y: 1.2, z: 32 },
+      { x: 84, y: 1.2, z: -76 },
+      { x: 84, y: 1.2, z: 82 },
+    ],
+    ffaSpawns: [
+      { x: -52, y: 1.2, z: -24 },
+      { x: 52, y: 1.2, z: -28 },
+      { x: -56, y: 1.2, z: 36 },
+      { x: 56, y: 1.2, z: 36 },
+      { x: -96, y: 1.2, z: -68 },
+      { x: 96, y: 1.2, z: -68 },
+      { x: -96, y: 1.2, z: 72 },
+      { x: 96, y: 1.2, z: 72 },
+      { x: 0, y: 1.2, z: -98 },
+      { x: 0, y: 1.2, z: 98 },
+      { x: -110, y: 1.2, z: 0 },
+      { x: 110, y: 1.2, z: 0 },
+      { x: -34, y: 1.2, z: -84 },
+      { x: 34, y: 1.2, z: 84 },
+      { x: 76, y: 1.2, z: -18 },
+      { x: -76, y: 1.2, z: 18 },
+    ],
+    lootSpawns: [
+      // Inside & around Downtown Villas
+      { x: -52, y: 0.55, z: -42 },
+      { x: -52, y: 5.3, z: -42 },
+      { x: -82, y: 0.55, z: -46 },
+      { x: -82, y: 5.0, z: -46 },
+      { x: -56, y: 0.55, z: -84 },
+      { x: -66, y: 0.45, z: -58 },
+      { x: -38, y: 0.45, z: -44 },
+      // Central Highway & Overpass
+      { x: 0, y: 5.35, z: -16 },
+      { x: -10, y: 5.35, z: -16 },
+      { x: 10, y: 5.35, z: -16 },
+      { x: -24, y: 0.45, z: 0 },
+      { x: 24, y: 0.45, z: 0 },
+      { x: 0, y: 0.45, z: 24 },
+      { x: 0, y: 0.45, z: -36 },
+      // Airfield Hangar & Helipad
+      { x: 84, y: 0.55, z: -52 },
+      { x: 76, y: 0.55, z: -56 },
+      { x: 94, y: 4.95, z: -52 },
+      { x: 50, y: 0.45, z: -52 },
+      { x: 42, y: 0.55, z: -26 },
+      { x: 66, y: 0.45, z: -38 },
+      // Gas Station & SW Ranch
+      { x: -78, y: 0.55, z: 68 },
+      { x: -56, y: 0.45, z: 62 },
+      { x: -42, y: 0.55, z: 44 },
+      { x: -42, y: 5.1, z: 44 },
+      { x: -68, y: 0.45, z: 48 },
+      // SE Cargo Depot & Command Office
+      { x: 64, y: 0.45, z: 64 },
+      { x: 56, y: 0.45, z: 70 },
+      { x: 74, y: 0.55, z: 86 },
+      { x: 74, y: 5.2, z: 86 },
+      { x: 78, y: 3.9, z: 54 },
+      // Ridges, Cabin & Outer Outposts
+      { x: -16, y: 0.55, z: -94 },
+      { x: 26, y: 5.2, z: -94 },
+      { x: -24, y: 3.3, z: 98 },
+      { x: -34, y: 0.45, z: -60 },
+      { x: 56, y: 0.45, z: -68 },
+      { x: 96, y: 0.45, z: 42 },
+      { x: -96, y: 0.45, z: 20 },
+      { x: -98, y: 0.45, z: -12 },
+      { x: 98, y: 0.45, z: 12 },
+      { x: 16, y: 0.45, z: 72 },
+    ],
+  };
+}
+
 export const MAP_ORDER = [
+  "royale_valley",
   "compound_05",
   "veridian_04",
   "citadel_01",
@@ -1399,6 +1672,7 @@ export const MAP_ORDER = [
 export type MapId = (typeof MAP_ORDER)[number];
 
 export const MAPS: Record<MapId, MapData> = {
+  royale_valley: buildVerdantRoyaleMap(),
   compound_05: buildCompoundMap(),
   veridian_04: buildVeridianMap(),
   citadel_01: buildCitadelMap(),

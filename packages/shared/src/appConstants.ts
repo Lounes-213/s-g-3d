@@ -1,4 +1,10 @@
-import type { WeaponId } from "./weapons.js";
+import type {
+  GripId,
+  MagId,
+  MuzzleId,
+  ScopeId,
+  WeaponId,
+} from "./weapons.js";
 
 export const GRAVITY = { x: 0, y: -30, z: 0 };
 
@@ -9,6 +15,9 @@ export const PHYSICS_CONFIG = {
   WALK_SPEED: 6.5,
   SPRINT_SPEED: 10.6,
   CROUCH_SPEED: 3.8,
+  SLIDE_SPEED: 15.2,
+  SLIDE_DURATION_MS: 660,
+  SLIDE_COOLDOWN_MS: 1150,
   DASH_IMPULSE: 24.0,
 };
 
@@ -17,13 +26,14 @@ export const PLAYER_CONFIG = {
   HALF_HEIGHT: 0.52, // Total height = ~2.0m
   EYE_LEVEL_OFFSET: 0.62,
   CROUCH_EYE_OFFSET: 0.15,
+  SLIDE_EYE_OFFSET: -0.08,
 };
 
 export const WINNING_RULES = {
   tdmScoreLimit: 30,
   ffaScoreLimit: 20,
   dominationScoreLimit: 150,
-  brMatchSeconds: 300,
+  brMatchSeconds: 360,
   defaultMatchSeconds: 240,
 };
 
@@ -34,11 +44,20 @@ export type TeamType = "red" | "blue" | "none";
 export type MatchState = "waiting" | "playing" | "ended";
 export type ThemeMode = "light" | "dark";
 export type RankTier = "Bronze" | "Silver" | "Gold" | "Platinum" | "Diamond" | "Apex";
+export type LootRarity = "common" | "rare" | "epic" | "legendary";
 
 export interface LootPickup {
   id: string;
-  kind: "medkit" | "armor" | "ammo" | "weapon";
+  kind: "medkit" | "armor" | "ammo" | "weapon" | "scope" | "attachment" | "airdrop";
+  rarity?: LootRarity;
+  label?: string;
   weaponId?: WeaponId;
+  scopeId?: ScopeId;
+  muzzleId?: MuzzleId;
+  gripId?: GripId;
+  magId?: MagId;
+  isAirdrop?: boolean;
+  isDeathBox?: boolean;
   x: number;
   y: number;
   z: number;

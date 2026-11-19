@@ -143,6 +143,7 @@ function HitSparkBurst({
   z,
   color,
   isHeadshot,
+  isArmorBreak,
   createdAt,
 }: {
   x: number;
@@ -150,6 +151,7 @@ function HitSparkBurst({
   z: number;
   color: string;
   isHeadshot: boolean;
+  isArmorBreak?: boolean;
   createdAt: number;
 }) {
   const shardRefs = useRef<Array<THREE.Mesh | null>>([]);
@@ -157,25 +159,28 @@ function HitSparkBurst({
   const ringMatRef = useRef<THREE.MeshBasicMaterial>(null);
 
   useFrame(() => {
-    const age = Math.min(1, Math.max(0, (Date.now() - createdAt) / (isHeadshot ? 420 : 340)));
-    const spread = (isHeadshot ? 1.45 : 0.8) * age;
-    const scale = Math.max(0.01, (1 - age) * (isHeadshot ? 1.65 : 1.0));
+    const dur = isHeadshot || isArmorBreak ? 440 : 340;
+    const age = Math.min(1, Math.max(0, (Date.now() - createdAt) / dur));
+    const spread = (isArmorBreak ? 1.65 : isHeadshot ? 1.45 : 0.85) * age;
+    const scale = Math.max(0.01, (1 - age) * (isArmorBreak ? 1.7 : isHeadshot ? 1.65 : 1.0));
     SPARK_DIRS.forEach(([dx, dy, dz], i) => {
       const m = shardRefs.current[i];
       if (!m) return;
       m.position.set(
         dx * spread,
-        dy * spread - age * age * 0.55,
+        dy * spread - age * age * 0.58,
         dz * spread,
       );
       m.scale.setScalar(scale);
     });
     if (ringRef.current && ringMatRef.current) {
-      const rs = 0.25 + age * 1.45;
+      const rs = 0.25 + age * 1.55;
       ringRef.current.scale.setScalar(rs);
-      ringMatRef.current.opacity = Math.max(0, (1 - age) * 0.85);
+      ringMatRef.current.opacity = Math.max(0, (1 - age) * 0.88);
     }
   });
+
+  const shardColor = isArmorBreak ? "#22d3ee" : isHeadshot ? "#fde047" : color;
 
   return (
     <group position={[x, y, z]}>
@@ -186,9 +191,9 @@ function HitSparkBurst({
             shardRefs.current[idx] = el;
           }}
         >
-          <octahedronGeometry args={[isHeadshot ? 0.08 : 0.06, 0]} />
+          <octahedronGeometry args={[isArmorBreak ? 0.095 : isHeadshot ? 0.08 : 0.06, 0]} />
           <meshBasicMaterial
-            color={isHeadshot ? "#fde047" : color}
+            color={shardColor}
             transparent
             opacity={0.95}
             depthWrite={false}
@@ -196,12 +201,12 @@ function HitSparkBurst({
           />
         </mesh>
       ))}
-      {isHeadshot && (
+      {(isHeadshot || isArmorBreak) && (
         <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.38, 0.52, 16]} />
+          <ringGeometry args={[0.38, 0.54, 16]} />
           <meshBasicMaterial
             ref={ringMatRef}
-            color="#fbbf24"
+            color={isArmorBreak ? "#06b6d4" : "#fbbf24"}
             transparent
             opacity={0.85}
             side={THREE.DoubleSide}
@@ -211,6 +216,52 @@ function HitSparkBurst({
         </mesh>
       )}
     </group>
+  );
+}
+
+function ShellCasingMesh({
+  x,
+  y,
+  z,
+  vx,
+  vy,
+  vz,
+  isShotgun,
+  createdAt,
+}: {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  isShotgun?: boolean;
+  createdAt: number;
+}) {
+  const ref = useRef<THREE.Mesh>(null);
+
+  useFrame(() => {
+    if (!ref.current) return;
+    const t = Math.max(0, (Date.now() - createdAt) / 1000);
+    const px = x + vx * t;
+    let py = y + vy * t - 4.9 * t * t;
+    const pz = z + vz * t;
+    if (py < 0.04) {
+      py = 0.04 + Math.abs(Math.sin(t * 14)) * 0.04 * Math.max(0, 1 - t);
+    }
+    ref.current.position.set(px, py, pz);
+    ref.current.rotation.set(t * 18, t * 22, t * 14);
+  });
+
+  return (
+    <mesh ref={ref} position={[x, y, z]}>
+      <cylinderGeometry args={[isShotgun ? 0.016 : 0.009, isShotgun ? 0.016 : 0.009, isShotgun ? 0.065 : 0.042, 6]} />
+      <meshStandardMaterial
+        color={isShotgun ? "#dc2626" : "#eab308"}
+        metalness={isShotgun ? 0.28 : 0.88}
+        roughness={isShotgun ? 0.45 : 0.22}
+      />
+    </mesh>
   );
 }
 
@@ -337,6 +388,7 @@ export default function CombatVFX() {
   const muzzleFlashes = useGameStore((state) => state.muzzleFlashes);
   const hitSparks = useGameStore((state) => state.hitSparks);
   const damagePopups = useGameStore((state) => state.damagePopups);
+  const shellCasings = useGameStore((state) => state.shellCasings);
   const pruneVfx = useGameStore((state) => state.pruneVfx);
 
   useEffect(() => {
@@ -374,7 +426,21 @@ export default function CombatVFX() {
           z={s.z}
           color={s.color}
           isHeadshot={s.isHeadshot}
+          isArmorBreak={s.isArmorBreak}
           createdAt={s.createdAt}
+        />
+      ))}
+      {shellCasings.map((c) => (
+        <ShellCasingMesh
+          key={c.id}
+          x={c.x}
+          y={c.y}
+          z={c.z}
+          vx={c.vx}
+          vy={c.vy}
+          vz={c.vz}
+          isShotgun={c.isShotgun}
+          createdAt={c.createdAt}
         />
       ))}
       {damagePopups.map((d) => (

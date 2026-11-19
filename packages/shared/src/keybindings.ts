@@ -7,6 +7,12 @@ export type KeyAction =
   | "sprint"
   | "crouch"
   | "reload"
+  | "interact"
+  | "leanLeft"
+  | "leanRight"
+  | "armorPlate"
+  | "medkit"
+  | "cycleScope"
   | "togglePerspective"
   | "toggleControls"
   | "pushToTalk"
@@ -36,12 +42,18 @@ export const DEFAULT_KEYBINDINGS: KeyBindingsMap = {
   sprint: "ShiftLeft",
   crouch: "KeyC",
   reload: "KeyR",
+  interact: "KeyF",
+  leanLeft: "KeyQ",
+  leanRight: "KeyE",
+  armorPlate: "KeyB",
+  medkit: "KeyX",
+  cycleScope: "KeyY",
   togglePerspective: "KeyV",
   toggleControls: "KeyH",
   pushToTalk: "KeyT",
-  skill1: "KeyQ",
-  skill2: "KeyE",
-  skill3: "KeyF",
+  skill1: "KeyZ",
+  skill2: "KeyU",
+  skill3: "KeyG",
   weapon1: "Digit1",
   weapon2: "Digit2",
   weapon3: "Digit3",
@@ -60,26 +72,32 @@ export const KEYBINDING_LABELS: Record<KeyAction, string> = {
   moveBackward: "Move Backward",
   moveLeft: "Strafe Left",
   moveRight: "Strafe Right",
-  jump: "Jump",
-  sprint: "Sprint / Run",
-  crouch: "Crouch / Slide",
+  jump: "Jump / Double Jump",
+  sprint: "Sprint / Hold Breath (ADS)",
+  crouch: "Crouch / Tactical Slide",
   reload: "Reload Weapon",
+  interact: "Loot / Supply Crate",
+  leanLeft: "Tactical Lean Left",
+  leanRight: "Tactical Lean Right",
+  armorPlate: "Insert Armor Plate",
+  medkit: "Use Tactical Medkit",
+  cycleScope: "Cycle Scope / Zoom",
   togglePerspective: "Switch 1P / 3P Camera",
   toggleControls: "Hide / Show Controls HUD",
   pushToTalk: "Voice Chat Push-to-Talk",
   skill1: "Skill 1: Hyper Dash",
   skill2: "Skill 2: Aegis Shield",
   skill3: "Skill 3: Frag / Plasma Blast",
-  weapon1: "Slot 1: VX-47 Assault",
-  weapon2: "Slot 2: Kobra-9 SMG",
-  weapon3: "Slot 3: M880 Shotgun",
-  weapon4: "Slot 4: Helios-3 Burst",
-  weapon5: "Slot 5: AWP-X Sniper",
-  weapon6: "Slot 6: Deagle-50 Tac",
-  weapon7: "Slot 7: MK-14 EBR DMR",
-  weapon8: "Slot 8: M249 Vulcan LMG",
-  weapon9: "Slot 9: Vector-45 PDW",
-  weapon10: "Slot 0: Magnum-44 Revolver",
+  weapon1: "Slot 1: M4A1 Striker",
+  weapon2: "Slot 2: AK-74M Zenith",
+  weapon3: "Slot 3: SCAR-H Heavy",
+  weapon4: "Slot 4: Kobra-9 MPX",
+  weapon5: "Slot 5: FN P90 PDW",
+  weapon6: "Slot 6: M880 Shotgun",
+  weapon7: "Slot 7: Helios-3 Burst",
+  weapon8: "Slot 8: AWP-X Sniper",
+  weapon9: "Slot 9: Kar98k Marksman",
+  weapon10: "Slot 0: Deagle-50 Tac",
   scoreboard: "Scoreboard",
 };
 

@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { io } from "socket.io-client";
 import {
@@ -9,18 +10,21 @@ import {
   CHARACTER_SKINS,
   MAP_ORDER,
   MAPS,
+  SCOPES,
   SKIN_ORDER,
-  WEAPONS,
-  WEAPON_ORDER,
+  computeEffectiveWeaponStats,
+  getDefaultAttachments,
   type CharacterId,
   type GameMode,
   type MapId,
   type PlayMode,
   type SkinId,
+  type WeaponAttachments,
   type WeaponId,
 } from "@block-shooter/shared";
 import {
   Bot,
+  ChevronRight,
   Crosshair,
   Eye,
   Globe,
@@ -28,80 +32,104 @@ import {
   KeyRound,
   Lock,
   LogIn,
-  Maximize2,
-  Moon,
-  Palette,
+  Map as MapIcon,
   Play,
   Plus,
   RefreshCw,
-  RotateCw,
   Settings,
   Shield,
-  Sun,
+  Smartphone,
   Trophy,
+  User,
   UserCheck,
   Users,
-  Volume2,
+  Wrench,
+  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAppStore } from "../stores/useAppStore";
 import { useAuthStore } from "../stores/useAuthStore";
 import { useGameStore, type PublicRoomSummary } from "../stores/useGameStore";
 import { useSettingsStore } from "../stores/useSettingsStore";
-import { fetchGlobalLeaderboard, signInOperator, type OperatorProfile } from "../services/firebaseService";
+import { signInOperator } from "../services/firebaseService";
 import { CharacterModel3D } from "../components/game/CharacterModel3D";
-import { WeaponArmoryModal, WeaponInspector3D } from "../components/game/WeaponInspector3D";
+import { WeaponArmoryModal } from "../components/game/WeaponInspector3D";
+import { MobileHudEditorModal } from "../components/game/ui/MobileHudEditorModal";
 import { listServerlessPublicRooms } from "../utils/serverlessRoomSync";
-import { getMatchHistory, type MatchHistoryEntry } from "../utils/matchHistory";
 import { soundEngine } from "../utils/soundEngine";
 import SideBar from "../components/SideBar";
 import { OperatorAvatar } from "../components/OperatorAvatar";
 import { AccountModal, FriendsModal, LeaderboardModal } from "../components/SocialModals";
 
-function RotatingOperatorPreview({
+function HeroOperatorStage({
   characterId,
   skinId,
   weaponId,
+  attachments,
 }: {
   characterId: CharacterId;
   skinId: SkinId;
   weaponId: WeaponId;
+  attachments: WeaponAttachments;
 }) {
   const ref = useRef<THREE.Group>(null);
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     if (ref.current) {
-      ref.current.rotation.y += delta * 0.55;
+      ref.current.rotation.y += delta * 0.28;
+      ref.current.position.y = -0.95 + Math.sin(state.clock.elapsedTime * 1.4) * 0.015;
     }
   });
+
   return (
-    <group ref={ref} position={[0, -0.05, 0]}>
-      <CharacterModel3D
-        characterId={characterId}
-        skinId={skinId}
-        team="none"
-        weaponId={weaponId}
-        pitch={0}
-        isMoving={false}
-      />
+    <group>
+      <group ref={ref} position={[0, -0.95, 0]} scale={1.15}>
+        <CharacterModel3D
+          characterId={characterId}
+          skinId={skinId}
+          team="none"
+          weaponId={weaponId}
+          weaponAttachments={attachments}
+          pitch={0}
+          isMoving={false}
+        />
+      </group>
+
+      {/* Atmospheric Obsidian Tactical Turntable Pedestal */}
+      <mesh position={[0, -1.04, 0]} receiveShadow>
+        <cylinderGeometry args={[1.38, 1.56, 0.14, 48]} />
+        <meshStandardMaterial color="#0b101b" metalness={0.86} roughness={0.28} />
+      </mesh>
+      <mesh position={[0, -0.965, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[1.28, 1.36, 48]} />
+        <meshBasicMaterial color="#f59e0b" />
+      </mesh>
+      <mesh position={[0, -0.962, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.92, 0.95, 48]} />
+        <meshBasicMaterial color="#06b6d4" transparent opacity={0.55} />
+      </mesh>
     </group>
   );
 }
 
+type LobbyDrawer = "mode_map" | "operator" | null;
+
 const WelcomePage = () => {
   const navigate = useNavigate();
   const { setActivePage, toggleSidebar } = useAppStore();
-  const { sessionConfig, setSessionConfig } = useGameStore();
+  const {
+    sessionConfig,
+    setSessionConfig,
+    isMobileHudEditorOpen,
+    setMobileHudEditorOpen,
+  } = useGameStore();
   const {
     perspective,
     togglePerspective,
     playerName: savedName,
     setPlayerName,
-    theme,
-    toggleTheme,
     skinId: savedSkinId,
     setSkinId: persistSkinId,
-    sprintMode,
-    setSprintMode,
+    weaponAttachments,
   } = useSettingsStore();
 
   const { firebaseUser, profile, incomingRequests, roomInvites } = useAuthStore();
@@ -117,14 +145,12 @@ const WelcomePage = () => {
   const [preferredTeam, setPreferredTeam] = useState<"auto" | "red" | "blue">(
     sessionConfig.preferredTeam || "auto",
   );
-  const [mapId, setMapId] = useState<MapId>(sessionConfig.mapId);
-  const [mode, setMode] = useState<GameMode>(sessionConfig.mode);
+  const [mapId, setMapId] = useState<MapId>(sessionConfig.mapId || "royale_valley");
+  const [mode, setMode] = useState<GameMode>(sessionConfig.mode || "br");
   const [botCount, setBotCount] = useState<number>(
-    sessionConfig.playMode === "solo" ? (sessionConfig.botCount || 4) : 0,
+    sessionConfig.playMode === "solo" ? sessionConfig.botCount || 9 : 0,
   );
-  const [characterId, setCharacterId] = useState<CharacterId>(
-    sessionConfig.characterId,
-  );
+  const [characterId, setCharacterId] = useState<CharacterId>(sessionConfig.characterId);
   const [skinId, setSkinId] = useState<SkinId>(savedSkinId || sessionConfig.skinId || "urban_ops");
   const [weaponId, setWeaponId] = useState<WeaponId>(sessionConfig.weaponId);
   const [callsign, setCallsign] = useState<string>(
@@ -135,27 +161,12 @@ const WelcomePage = () => {
   const [refreshingRooms, setRefreshingRooms] = useState(false);
   const [activeModal, setActiveModal] = useState<"account" | "leaderboard" | "friends" | null>(null);
   const [leaderboardTab, setLeaderboardTab] = useState<"leaderboard" | "players" | "history">("leaderboard");
-  const [showcaseMode, setShowcaseMode] = useState<"operator" | "weapon">("operator");
+  const [openDrawer, setOpenDrawer] = useState<LobbyDrawer>(null);
   const [armoryModalOpen, setArmoryModalOpen] = useState(false);
-  const [lobbyOperators, setLobbyOperators] = useState<OperatorProfile[]>([]);
-  const [recentMatches] = useState<MatchHistoryEntry[]>(() => getMatchHistory());
 
   useEffect(() => {
     setActivePage("welcome");
   }, [setActivePage]);
-
-  useEffect(() => {
-    if (!firebaseUser) return;
-    let active = true;
-    fetchGlobalLeaderboard(24)
-      .then((list) => {
-        if (active) setLobbyOperators(list);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [firebaseUser, profile]);
 
   const fetchRooms = () => {
     setRefreshingRooms(true);
@@ -177,7 +188,8 @@ const WelcomePage = () => {
 
     const serverUrl =
       (import.meta.env.VITE_SERVER_URL as string)?.trim() ||
-      (typeof window !== "undefined" && (window as unknown as { __SG3D_SERVER_URL__?: string }).__SG3D_SERVER_URL__) ||
+      (typeof window !== "undefined" &&
+        (window as unknown as { __SG3D_SERVER_URL__?: string }).__SG3D_SERVER_URL__) ||
       "";
     const sock = serverUrl
       ? io(serverUrl, { transports: ["websocket", "polling"], timeout: 4000, reconnection: false })
@@ -195,47 +207,12 @@ const WelcomePage = () => {
   };
 
   useEffect(() => {
-    if (playMode !== "room") return;
-    let active = true;
-    let socketRooms: PublicRoomSummary[] = [];
-    let cloudRooms: PublicRoomSummary[] = [];
-    const mergeAndSet = () => {
-      if (!active) return;
-      const merged = new Map<string, PublicRoomSummary>();
-      cloudRooms.forEach((r) => merged.set(r.id, r));
-      socketRooms.forEach((r) => merged.set(r.id, r));
-      setRooms(Array.from(merged.values()));
-    };
-
-    void listServerlessPublicRooms()
-      .then((list) => {
-        cloudRooms = list;
-        mergeAndSet();
-      })
-      .catch(() => {});
-
-    const serverUrl =
-      (import.meta.env.VITE_SERVER_URL as string)?.trim() ||
-      (typeof window !== "undefined" && (window as unknown as { __SG3D_SERVER_URL__?: string }).__SG3D_SERVER_URL__) ||
-      "";
-    const sock = serverUrl
-      ? io(serverUrl, { transports: ["websocket", "polling"], timeout: 4000, reconnection: false })
-      : io({ transports: ["websocket", "polling"], timeout: 1200, reconnection: false });
-    sock.on("rooms_list", (list: PublicRoomSummary[]) => {
-      socketRooms = list || [];
-      mergeAndSet();
-      setRefreshingRooms(false);
-      sock.disconnect();
-    });
-    const timer = setTimeout(() => {
-      sock.disconnect();
-    }, 1300);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-      sock.disconnect();
-    };
-  }, [playMode]);
+    if (playMode !== "room" || openDrawer !== "mode_map") return;
+    const timer = window.setTimeout(() => {
+      fetchRooms();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [playMode, openDrawer]);
 
   const handleGoogleSignIn = async () => {
     soundEngine.unlock();
@@ -286,9 +263,15 @@ const WelcomePage = () => {
       mode,
       botCount:
         effectivePlayMode === "solo"
-          ? (botCount > 0 ? botCount : 4)
-          : (roomAction === "create" ? botCount : 0),
-      maxPlayers: 12,
+          ? botCount > 0
+            ? botCount
+            : mode === "br"
+              ? 9
+              : 5
+          : roomAction === "create"
+            ? botCount
+            : 0,
+      maxPlayers: 16,
       characterId,
       skinId,
       weaponId,
@@ -298,27 +281,17 @@ const WelcomePage = () => {
     navigate("/play");
   };
 
-  const selectedChar = CHARACTERS[characterId];
+  const selectedChar = CHARACTERS[characterId] || CHARACTERS.striker;
   const selectedSkin = CHARACTER_SKINS[skinId] || CHARACTER_SKINS.urban_ops;
-  const selectedWeapon = WEAPONS[weaponId];
-
-  const isLight = theme === "light";
+  const selectedMap = MAPS[mapId] || MAPS.royale_valley;
+  const activeAtt = weaponAttachments[weaponId] || getDefaultAttachments(weaponId);
+  const effWeapon = computeEffectiveWeaponStats(weaponId, activeAtt);
   const pendingSocial = incomingRequests.length + roomInvites.length;
-
-  const cardBg = isLight
-    ? "bg-white border-slate-200 shadow-sm"
-    : "bg-slate-950/90 border-white/15";
-  const subCardBg = isLight
-    ? "bg-slate-50 border-slate-200 hover:border-slate-400"
-    : "bg-slate-900/75 border-white/10 hover:border-white/30";
-  const mutedText = isLight ? "text-slate-500" : "text-slate-400";
 
   return (
     <main
       id="main-content"
-      className={`relative min-h-dvh font-tactical overflow-x-hidden transition-colors ${
-        isLight ? "bg-slate-50 text-slate-900" : "bg-[#060911] text-white"
-      }`}
+      className="relative w-full h-dvh overflow-hidden bg-[#080a0f] text-white font-tactical select-none"
     >
       <SideBar />
 
@@ -336,6 +309,7 @@ const WelcomePage = () => {
           currentMode={mode}
         />
       )}
+
       <WeaponArmoryModal
         isOpen={armoryModalOpen}
         onClose={() => setArmoryModalOpen(false)}
@@ -347,74 +321,83 @@ const WelcomePage = () => {
         skinId={skinId}
       />
 
-      {/* Architectural Grid Backdrop */}
+      <MobileHudEditorModal
+        isOpen={isMobileHudEditorOpen}
+        onClose={() => setMobileHudEditorOpen(false)}
+      />
+
+      {/* FULL-SCREEN LIVE 3D OPERATOR SHOWCASE STAGE */}
       <div
-        className="fixed inset-0 pointer-events-none opacity-35"
+        className="absolute inset-0 z-0"
         style={{
-          backgroundImage: isLight
-            ? "radial-gradient(circle at 20% 20%, rgba(14,165,233,0.12), transparent 45%), linear-gradient(to right, rgba(15,23,42,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.04) 1px, transparent 1px)"
-            : "radial-gradient(circle at 20% 20%, rgba(56,189,248,0.2), transparent 45%), linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "100% 100%, 48px 48px, 48px 48px",
+          background:
+            "radial-gradient(circle at 50% 42%, rgba(245,158,11,0.14) 0%, rgba(12,18,30,0.92) 48%, #06080d 100%)",
+        }}
+      >
+        <Canvas
+          shadows
+          dpr={[1, 2]}
+          camera={{ position: [0, 0.48, 3.65], fov: 40 }}
+          gl={{ antialias: true, alpha: true }}
+        >
+          <ambientLight intensity={0.9} />
+          <directionalLight position={[4, 7, 5]} intensity={2.4} color="#fff7ed" castShadow />
+          <directionalLight position={[-5, 3, -3]} intensity={1.3} color="#06b6d4" />
+          <pointLight position={[0, 2.2, 2.5]} intensity={1.1} color="#f59e0b" />
+          <Suspense fallback={null}>
+            <HeroOperatorStage
+              characterId={characterId}
+              skinId={skinId}
+              weaponId={weaponId}
+              attachments={activeAtt}
+            />
+          </Suspense>
+          <OrbitControls
+            enablePan={false}
+            enableZoom={false}
+            minPolarAngle={Math.PI * 0.35}
+            maxPolarAngle={Math.PI * 0.54}
+          />
+        </Canvas>
+      </div>
+
+      {/* Subtle Vignette Gradient for High-Contrast Foreground Controls */}
+      <div
+        className="absolute inset-0 pointer-events-none z-10"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(6,8,13,0.82) 0%, transparent 22%, transparent 68%, rgba(6,8,13,0.92) 100%)",
         }}
       />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-5 flex flex-col gap-5">
-        {/* TOP HEADER */}
-        <header
-          className={`flex flex-wrap items-center justify-between gap-3 border-b pb-4 ${
-            isLight ? "border-slate-200" : "border-white/10"
-          }`}
-        >
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 bg-gradient-to-br from-sky-600 to-cyan-500 flex items-center justify-center text-white font-black text-xl shadow-md">
+      {/* FOREGROUND SINGLE-VIEWPORT COMMAND INTERFACE */}
+      <div className="relative z-20 w-full h-full flex flex-col justify-between p-3 sm:p-5 pointer-events-none">
+        {/* TOP MINIMAL AAA HEADER BAR */}
+        <header className="flex items-center justify-between gap-2 pointer-events-auto">
+          <div className="flex items-center gap-2.5 sm:gap-3.5">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 font-black text-lg sm:text-xl clip-tactical-sm shadow-lg">
               SG
             </div>
             <div>
-              <h1 className="text-3xl sm:text-4xl font-black tracking-[0.2em] uppercase leading-none">
+              <h1 className="text-xl sm:text-3xl font-black tracking-[0.22em] uppercase leading-none text-white">
                 S-G-3D
               </h1>
-              <p
-                className={`text-[11px] font-bold uppercase tracking-[0.25em] ${
-                  isLight ? "text-sky-700" : "text-sky-400"
-                }`}
-              >
-                Tactical 3D Arena & Battle Royale • 1P / 3P • Voice & Ranked
+              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.22em] text-amber-400 mt-0.5">
+                Tactical Battle Royale & Arena
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Callsign Input */}
-            <div
-              className={`flex items-center border px-3 py-1.5 ${
-                isLight ? "bg-white border-slate-300" : "bg-slate-900 border-white/15"
-              }`}
-            >
-              <span className={`text-[10px] font-bold uppercase mr-2 ${mutedText}`}>
-                Callsign
-              </span>
-              <input
-                type="text"
-                maxLength={20}
-                value={callsign}
-                onChange={(e) => setCallsign(e.target.value)}
-                className="bg-transparent text-xs sm:text-sm font-black uppercase tracking-wider outline-none w-28 sm:w-32"
-              />
-            </div>
-
-            {/* Account & Rank Button with Gmail Avatar */}
+          {/* Right Compact Icon & Profile Utility Cluster */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Operator Callsign & Rank */}
             <button
+              type="button"
               onClick={() => {
                 soundEngine.playClick();
                 setActiveModal("account");
               }}
-              className={`flex items-center gap-2 px-2.5 py-1.5 border text-xs font-black uppercase tracking-wider cursor-pointer ${
-                firebaseUser
-                  ? "bg-emerald-600 border-emerald-500 text-white"
-                  : isLight
-                    ? "bg-white border-slate-300 hover:border-sky-600 text-slate-800"
-                    : "bg-slate-900 border-white/20 hover:border-sky-400 text-white"
-              }`}
+              className="flex items-center gap-2 px-2.5 py-1.5 bg-[#0c101a]/92 border border-white/15 hover:border-amber-400 text-xs font-black uppercase cursor-pointer clip-tactical-sm"
             >
               {firebaseUser ? (
                 <OperatorAvatar
@@ -423,906 +406,700 @@ const WelcomePage = () => {
                   size="sm"
                 />
               ) : (
-                <UserCheck size={14} />
+                <UserCheck size={14} className="text-amber-400" />
               )}
-              <span>
-                {profile
-                  ? `${profile.rankTier} (${profile.rankPoints})`
-                  : firebaseUser
-                    ? firebaseUser.displayName || "Signed In"
-                    : "Sign In"}
+              <span className="hidden sm:inline max-w-[110px] truncate">
+                {profile ? profile.username : callsign}
               </span>
             </button>
 
-            {/* Leaderboard & Directory Button */}
             <button
+              type="button"
               onClick={() => {
                 soundEngine.playClick();
                 setLeaderboardTab("leaderboard");
                 setActiveModal("leaderboard");
               }}
-              className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-black uppercase tracking-wider cursor-pointer ${
-                isLight
-                  ? "bg-white border-slate-300 hover:border-amber-500 text-slate-800"
-                  : "bg-slate-900 border-white/20 hover:border-amber-400 text-white"
-              }`}
+              title="Leaderboard & Match History"
+              className="p-2 sm:px-3 sm:py-2 bg-[#0c101a]/92 border border-white/15 hover:border-amber-400 text-white text-xs font-black uppercase flex items-center gap-1.5 cursor-pointer clip-tactical-sm"
             >
-              <Trophy size={14} className="text-amber-500" />
-              <span>Ranks & Players</span>
+              <Trophy size={15} className="text-amber-400" />
+              <span className="hidden md:inline">Ranks</span>
             </button>
 
-            {/* Match Results Button */}
             <button
+              type="button"
               onClick={() => {
                 soundEngine.playClick();
                 setLeaderboardTab("history");
                 setActiveModal("leaderboard");
               }}
-              className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-black uppercase tracking-wider cursor-pointer ${
-                isLight
-                  ? "bg-white border-slate-300 hover:border-emerald-500 text-slate-800"
-                  : "bg-slate-900 border-white/20 hover:border-emerald-400 text-white"
-              }`}
+              title="Match History"
+              className="hidden sm:flex p-2 bg-[#0c101a]/92 border border-white/15 hover:border-cyan-400 text-white cursor-pointer clip-tactical-sm"
             >
-              <History size={14} className="text-emerald-500" />
-              <span>Results</span>
+              <History size={15} className="text-cyan-400" />
             </button>
 
-            {/* Friends & Room Invites Button */}
             <button
+              type="button"
               onClick={() => {
                 soundEngine.playClick();
                 setActiveModal("friends");
               }}
-              className={`relative flex items-center gap-1.5 px-3 py-2 border text-xs font-black uppercase tracking-wider cursor-pointer ${
-                isLight
-                  ? "bg-white border-slate-300 hover:border-purple-500 text-slate-800"
-                  : "bg-slate-900 border-white/20 hover:border-purple-400 text-white"
-              }`}
+              title="Friends & Squad Invites"
+              className="relative p-2 sm:px-3 sm:py-2 bg-[#0c101a]/92 border border-white/15 hover:border-cyan-400 text-white text-xs font-black uppercase flex items-center gap-1.5 cursor-pointer clip-tactical-sm"
             >
-              <Users size={14} className="text-purple-500" />
-              <span>Friends</span>
+              <Users size={15} className="text-cyan-400" />
+              <span className="hidden md:inline">Squad</span>
               {pendingSocial > 0 && (
-                <span className="px-1.5 py-0.2 bg-rose-600 text-white text-[10px] font-black">
+                <span className="px-1.5 bg-rose-600 text-white text-[9px] font-black">
                   {pendingSocial}
                 </span>
               )}
             </button>
 
-            {/* Light / Dark Mode Switch */}
             <button
+              type="button"
               onClick={() => {
                 soundEngine.playClick();
-                toggleTheme();
+                setMobileHudEditorOpen(true);
               }}
-              className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-black uppercase cursor-pointer ${
-                isLight
-                  ? "bg-amber-50 border-amber-300 text-amber-800"
-                  : "bg-slate-900 border-white/20 text-amber-300"
-              }`}
-              title="Toggle Light / Dark Mode"
+              title="Customize Mobile Touch Controls"
+              className="p-2 bg-[#0c101a]/92 border border-white/15 hover:border-amber-400 text-amber-400 cursor-pointer clip-tactical-sm"
             >
-              {isLight ? <Sun size={14} /> : <Moon size={14} />}
-              <span>{isLight ? "Light" : "Dark"}</span>
+              <Smartphone size={16} />
             </button>
 
-            {/* 1P / 3P Perspective Quick Toggle */}
             <button
-              onClick={() => {
-                soundEngine.playClick();
-                togglePerspective();
-              }}
-              className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-black uppercase tracking-wider cursor-pointer ${
-                isLight
-                  ? "bg-white border-sky-500 text-sky-700"
-                  : "bg-slate-900 border-sky-400/50 text-sky-300"
-              }`}
-            >
-              <Eye size={14} />
-              <span>{perspective.toUpperCase()}</span>
-            </button>
-
-            {/* Open Keybinds & Settings */}
-            <button
+              type="button"
               onClick={() => {
                 soundEngine.playClick();
                 toggleSidebar();
               }}
-              className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-black uppercase tracking-wider cursor-pointer ${
-                isLight
-                  ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800"
-                  : "bg-white/10 hover:bg-white/20 border-white/20 text-white"
-              }`}
+              title="Settings, Audio & Keybinds"
+              className="p-2 sm:px-3 sm:py-2 bg-[#0c101a]/92 border border-white/15 hover:border-amber-400 text-white text-xs font-black uppercase flex items-center gap-1.5 cursor-pointer clip-tactical-sm"
             >
-              <Settings size={14} />
-              <span>Settings</span>
+              <Settings size={15} />
+              <span className="hidden sm:inline">Settings</span>
             </button>
           </div>
         </header>
 
-        {/* Active Room Invite Banner */}
+        {/* Active Squad Invite Toast */}
         {roomInvites.length > 0 && (
-          <div className="p-3 border border-amber-500 bg-amber-500/15 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <span className="font-black uppercase">
-              Squad Invite from {roomInvites[0].fromUsername}: Room [{roomInvites[0].roomId}]
+          <div className="self-center pointer-events-auto px-4 py-2 bg-[#0d121d]/95 border border-amber-500 flex items-center gap-3 text-xs clip-tactical-sm">
+            <span className="font-black uppercase text-amber-300">
+              Invite from {roomInvites[0].fromUsername} [{roomInvites[0].roomId}]
             </span>
             <button
+              type="button"
               onClick={() => handleDeploy(roomInvites[0].roomId)}
-              className="px-4 py-1.5 bg-emerald-600 text-white font-black uppercase cursor-pointer"
+              className="px-3 py-1 bg-amber-500 text-slate-950 font-black uppercase cursor-pointer"
             >
-              Join Friend Now
+              Join
             </button>
           </div>
         )}
 
-        {/* MAIN 2-COLUMN COMMAND DECK */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* LEFT COLUMN (7 cols): Play Mode, Rooms, Map, Game Mode, Weapons */}
-          <div className="lg:col-span-7 flex flex-col gap-4">
-            {/* 1. Play Mode Selector */}
-            <section className={`border p-4 sm:p-5 ${cardBg}`}>
-              <h2 className={`text-xs font-black uppercase tracking-[0.22em] mb-3 ${mutedText}`}>
-                1. Select Deployment Mode
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <button
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setPlayMode("solo");
-                    setBotCount(4);
-                  }}
-                  className={`p-3.5 border text-left transition-all cursor-pointer ${
-                    playMode === "solo"
-                      ? isLight
-                        ? "bg-emerald-50 border-emerald-600 text-emerald-950"
-                        : "bg-emerald-500/15 border-emerald-400 text-white"
-                      : subCardBg
-                  }`}
-                >
-                  <Bot size={20} className={playMode === "solo" ? "text-emerald-600" : mutedText} />
-                  <div className="mt-1.5 text-sm font-black uppercase tracking-wider">
-                    Solo vs Bots
-                  </div>
-                  <div className={`text-[11px] ${mutedText}`}>
-                    Instant offline combat vs tactical AI
-                  </div>
-                </button>
+        {/* MIDDLE LEFT FLOATING TACTICAL DOCK (Everything neatly tucked behind crisp buttons!) */}
+        <div className="my-auto flex flex-col gap-2 w-fit pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playClick();
+              setArmoryModalOpen(true);
+            }}
+            className="group flex items-center justify-between gap-4 w-52 sm:w-64 px-4 py-3 bg-[#0a0e17]/90 hover:bg-[#121927] border border-white/15 hover:border-amber-400 text-left cursor-pointer transition-all clip-tactical-sm"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-amber-400">
+                <Wrench size={11} /> Armory & Gunsmith
+              </div>
+              <div className="text-sm font-black uppercase truncate text-white mt-0.5">
+                {effWeapon.name}
+              </div>
+              <div className="text-[10px] font-mono text-cyan-300 truncate">
+                {SCOPES[activeAtt.scope].shortName} {effWeapon.adsZoom.toFixed(1)}x • {effWeapon.magSize} MAG
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-slate-400 group-hover:text-amber-400 shrink-0" />
+          </button>
 
-                <button
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setPlayMode("online");
-                    setBotCount(0);
-                  }}
-                  className={`p-3.5 border text-left transition-all cursor-pointer ${
-                    playMode === "online"
-                      ? isLight
-                        ? "bg-sky-50 border-sky-600 text-sky-950"
-                        : "bg-sky-500/15 border-sky-400 text-white"
-                      : subCardBg
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <Globe size={20} className={playMode === "online" ? "text-sky-600" : mutedText} />
-                    {!firebaseUser && <Lock size={14} className="text-amber-500" />}
-                  </div>
-                  <div className="mt-1.5 text-sm font-black uppercase tracking-wider">
-                    Online Match
-                  </div>
-                  <div className={`text-[11px] ${mutedText}`}>
-                    Pure Pro PvP with real players
-                  </div>
-                </button>
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playClick();
+              setOpenDrawer(openDrawer === "operator" ? null : "operator");
+            }}
+            className={`group flex items-center justify-between gap-4 w-52 sm:w-64 px-4 py-3 border text-left cursor-pointer transition-all clip-tactical-sm ${
+              openDrawer === "operator"
+                ? "bg-amber-500/20 border-amber-400"
+                : "bg-[#0a0e17]/90 hover:bg-[#121927] border-white/15 hover:border-amber-400"
+            }`}
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-cyan-400">
+                <User size={11} /> Operators & Skins
+              </div>
+              <div className="text-sm font-black uppercase truncate text-white mt-0.5">
+                {selectedChar.codename}
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">
+                {selectedSkin.name} • {selectedChar.maxHealth} HP
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-slate-400 group-hover:text-amber-400 shrink-0" />
+          </button>
 
-                <button
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setPlayMode("room");
-                    setBotCount(0);
-                  }}
-                  className={`p-3.5 border text-left transition-all cursor-pointer ${
-                    playMode === "room"
-                      ? isLight
-                        ? "bg-purple-50 border-purple-600 text-purple-950"
-                        : "bg-purple-500/15 border-purple-400 text-white"
-                      : subCardBg
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <Users size={20} className={playMode === "room" ? "text-purple-600" : mutedText} />
-                    {!firebaseUser && <Lock size={14} className="text-amber-500" />}
-                  </div>
-                  <div className="mt-1.5 text-sm font-black uppercase tracking-wider">
-                    Custom Room
-                  </div>
-                  <div className={`text-[11px] ${mutedText}`}>
-                    Private room or join with code
-                  </div>
-                </button>
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playClick();
+              togglePerspective();
+            }}
+            className="flex items-center justify-between w-52 sm:w-64 px-4 py-2.5 bg-[#0a0e17]/90 hover:bg-[#121927] border border-white/15 hover:border-cyan-400 text-left cursor-pointer clip-tactical-sm"
+          >
+            <div className="flex items-center gap-2 text-xs font-black uppercase">
+              <Eye size={14} className="text-cyan-400" />
+              <span>Camera Perspective</span>
+            </div>
+            <span className="text-xs font-black font-mono text-amber-400">
+              {perspective.toUpperCase()}
+            </span>
+          </button>
+        </div>
+
+        {/* BOTTOM COMMAND BAR: Mode/Map Selector Card + Dominant Amber DEPLOY CTA */}
+        <footer className="flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-3 pointer-events-auto">
+          {/* Mode & Map Launcher Card */}
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playClick();
+              setOpenDrawer(openDrawer === "mode_map" ? null : "mode_map");
+            }}
+            className={`flex items-center justify-between gap-4 px-4 py-3 sm:min-w-[320px] border text-left cursor-pointer transition-all clip-tactical-sm ${
+              openDrawer === "mode_map"
+                ? "bg-amber-500/20 border-amber-400"
+                : "bg-[#0a0e17]/92 hover:bg-[#121927] border-white/15 hover:border-amber-400"
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 bg-amber-500/15 border border-amber-500/40 flex items-center justify-center shrink-0">
+                <MapIcon size={18} className="text-amber-400" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">
+                  {playMode.toUpperCase()} • {mode === "br" ? "BATTLE ROYALE" : mode.toUpperCase()}
+                  {playMode === "solo" ? ` • ${botCount} BOTS` : ""}
+                </div>
+                <div className="text-base font-black uppercase tracking-wider truncate text-white">
+                  {selectedMap.name}
+                </div>
+                <div className="text-[10px] text-slate-400 truncate">
+                  Tap to change Mode, Map or Room
+                </div>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-amber-400 shrink-0" />
+          </button>
+
+          {/* Dominant Chamfered Amber DEPLOY Button */}
+          <button
+            type="button"
+            onClick={() => handleDeploy()}
+            className="px-8 sm:px-12 py-4 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:brightness-110 text-slate-950 font-black text-lg sm:text-xl uppercase tracking-[0.26em] flex items-center justify-center gap-3 shadow-[0_0_32px_rgba(245,158,11,0.38)] cursor-pointer transition-transform active:scale-[0.98] clip-tactical-btn"
+          >
+            <Play size={22} fill="currentColor" />
+            <span>DEPLOY</span>
+            <Crosshair size={20} />
+          </button>
+        </footer>
+      </div>
+
+      {/* SLIDE-OVER DRAWER 1: MODE, MAP, ROOM & BOTS SELECTOR */}
+      {openDrawer === "mode_map" && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex justify-end"
+          onClick={() => setOpenDrawer(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xl h-dvh bg-[#090d16] border-l border-amber-500/35 flex flex-col shadow-2xl"
+          >
+            <div className="px-5 py-4 bg-[#0d121d] border-b border-white/10 flex items-center justify-between shrink-0">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-400">
+                  Tactical Mission Setup
+                </div>
+                <h2 className="text-lg font-black uppercase tracking-wider">
+                  Deployment Mode & Maps ({MAP_ORDER.length})
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenDrawer(null)}
+                className="p-2 bg-white/5 hover:bg-amber-500 hover:text-slate-950 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              {/* Callsign quick edit */}
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1.5">
+                  Operator Callsign
+                </label>
+                <input
+                  type="text"
+                  maxLength={20}
+                  value={callsign}
+                  onChange={(e) => setCallsign(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#111622] border border-white/15 focus:border-amber-400 text-sm font-black uppercase tracking-wider outline-none"
+                />
               </div>
 
-              {playMode !== "solo" && !firebaseUser && (
-                <div className="mt-3 p-3 border border-amber-500/60 bg-amber-500/10 flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-xs">
-                    <div className="font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                      Google Account Required for Online & Room Matches
-                    </div>
-                    <div className={`text-[11px] ${mutedText}`}>
-                      Connect your Gmail account to display your profile avatar, sync ranks, and join multiplayer servers.
-                    </div>
-                  </div>
+              {/* Play Mode Tabs */}
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                  Match Type
+                </div>
+                <div className="grid grid-cols-3 gap-2">
                   <button
-                    onClick={() => void handleGoogleSignIn()}
-                    disabled={signingInGoogle}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shrink-0"
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setPlayMode("solo");
+                      if (botCount === 0) setBotCount(mode === "br" ? 9 : 5);
+                    }}
+                    className={`p-3 border text-left cursor-pointer ${
+                      playMode === "solo"
+                        ? "bg-amber-500/20 border-amber-400 text-white"
+                        : "bg-[#111622] border-white/10 text-slate-300"
+                    }`}
                   >
-                    <LogIn size={14} />
-                    <span>{signingInGoogle ? "Connecting..." : "Sign In With Google"}</span>
+                    <Bot size={16} className="text-amber-400 mb-1" />
+                    <div className="text-xs font-black uppercase">Solo vs AI</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setPlayMode("online");
+                      setBotCount(0);
+                    }}
+                    className={`p-3 border text-left cursor-pointer ${
+                      playMode === "online"
+                        ? "bg-cyan-500/20 border-cyan-400 text-white"
+                        : "bg-[#111622] border-white/10 text-slate-300"
+                    }`}
+                  >
+                    <div className="flex justify-between">
+                      <Globe size={16} className="text-cyan-400 mb-1" />
+                      {!firebaseUser && <Lock size={12} className="text-amber-400" />}
+                    </div>
+                    <div className="text-xs font-black uppercase">Online PvP</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setPlayMode("room");
+                      setBotCount(0);
+                    }}
+                    className={`p-3 border text-left cursor-pointer ${
+                      playMode === "room"
+                        ? "bg-purple-500/20 border-purple-400 text-white"
+                        : "bg-[#111622] border-white/10 text-slate-300"
+                    }`}
+                  >
+                    <div className="flex justify-between">
+                      <Users size={16} className="text-purple-400 mb-1" />
+                      {!firebaseUser && <Lock size={12} className="text-amber-400" />}
+                    </div>
+                    <div className="text-xs font-black uppercase">Custom Room</div>
                   </button>
                 </div>
-              )}
-            </section>
 
-            {/* Custom Room Panel */}
-            {playMode === "room" && (
-              <section className={`border p-4 space-y-3 ${cardBg}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-2">
+                {playMode !== "solo" && !firebaseUser && (
+                  <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/45 flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-amber-200">
+                      Sign in with Google for Online & Rooms
+                    </span>
                     <button
-                      onClick={() => setRoomAction("create")}
-                      className={`px-3.5 py-1.5 text-xs font-black uppercase border cursor-pointer flex items-center gap-1.5 ${
-                        roomAction === "create"
-                          ? "bg-purple-600 border-purple-500 text-white"
-                          : subCardBg
-                      }`}
+                      type="button"
+                      onClick={() => void handleGoogleSignIn()}
+                      disabled={signingInGoogle}
+                      className="px-3 py-1.5 bg-amber-500 text-slate-950 text-[10px] font-black uppercase flex items-center gap-1 cursor-pointer shrink-0"
                     >
-                      <Plus size={14} /> Create Room
+                      <LogIn size={12} /> {signingInGoogle ? "..." : "Google Sign-In"}
                     </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Room Options */}
+              {playMode === "room" && (
+                <div className="p-3.5 bg-[#0e1320] border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setRoomAction("create")}
+                        className={`px-3 py-1.5 text-[11px] font-black uppercase border cursor-pointer flex items-center gap-1 ${
+                          roomAction === "create"
+                            ? "bg-amber-500 text-slate-950 border-amber-400"
+                            : "bg-[#141a29] border-white/10 text-slate-300"
+                        }`}
+                      >
+                        <Plus size={12} /> Create
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRoomAction("join")}
+                        className={`px-3 py-1.5 text-[11px] font-black uppercase border cursor-pointer flex items-center gap-1 ${
+                          roomAction === "join"
+                            ? "bg-amber-500 text-slate-950 border-amber-400"
+                            : "bg-[#141a29] border-white/10 text-slate-300"
+                        }`}
+                      >
+                        <KeyRound size={12} /> Join Code
+                      </button>
+                    </div>
                     <button
-                      onClick={() => setRoomAction("join")}
-                      className={`px-3.5 py-1.5 text-xs font-black uppercase border cursor-pointer flex items-center gap-1.5 ${
-                        roomAction === "join"
-                          ? "bg-purple-600 border-purple-500 text-white"
-                          : subCardBg
-                      }`}
+                      type="button"
+                      onClick={fetchRooms}
+                      className="text-[10px] font-black uppercase text-cyan-400 flex items-center gap-1 cursor-pointer"
                     >
-                      <KeyRound size={14} /> Join by Code
+                      <RefreshCw size={12} className={refreshingRooms ? "animate-spin" : ""} /> Refresh
                     </button>
                   </div>
 
-                  <button
-                    onClick={fetchRooms}
-                    className="text-xs font-bold uppercase text-sky-600 flex items-center gap-1 cursor-pointer"
-                  >
-                    <RefreshCw size={13} className={refreshingRooms ? "animate-spin" : ""} /> Refresh
-                  </button>
-                </div>
-
-                {roomAction === "create" ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className={`block text-[10px] font-bold uppercase mb-1 ${mutedText}`}>
-                        Room Name
-                      </label>
+                  {roomAction === "create" ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <input
                         type="text"
                         value={customRoomName}
                         onChange={(e) => setCustomRoomName(e.target.value)}
-                        className={`w-full px-3 py-2 border text-sm font-bold outline-none ${
-                          isLight ? "bg-slate-50 border-slate-300" : "bg-slate-900 border-white/15"
-                        }`}
+                        className="px-3 py-2 bg-[#141a29] border border-white/15 text-xs font-bold outline-none"
                       />
-                    </div>
-                    <div className="flex items-end">
                       <button
+                        type="button"
                         onClick={() => setIsPrivateRoom(!isPrivateRoom)}
-                        className={`w-full py-2 px-3 border text-xs font-black uppercase cursor-pointer ${
+                        className={`py-2 px-3 border text-[11px] font-black uppercase cursor-pointer ${
                           isPrivateRoom
                             ? "bg-amber-500 text-slate-950 border-amber-400"
-                            : subCardBg
+                            : "bg-[#141a29] border-white/15 text-slate-300"
                         }`}
                       >
-                        {isPrivateRoom ? "Private (Invite / Code Only)" : "Public (Listed)"}
+                        {isPrivateRoom ? "Private Code Only" : "Public Listed"}
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="ENTER ROOM CODE (e.g. X7K2P)"
-                        value={roomCodeInput}
-                        onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
-                        className={`flex-1 px-3 py-2 border text-sm font-black uppercase tracking-widest outline-none ${
-                          isLight ? "bg-slate-50 border-slate-300" : "bg-slate-900 border-white/15"
-                        }`}
-                      />
-                      <button
-                        onClick={() => handleDeploy()}
-                        className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black uppercase text-xs tracking-wider cursor-pointer"
-                      >
-                        Join
-                      </button>
-                    </div>
-
-                    {rooms.length > 0 && (
-                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                        {rooms.map((r) => (
-                          <div
-                            key={r.id}
-                            className={`flex items-center justify-between px-3 py-2 border text-xs ${subCardBg}`}
-                          >
-                            <div>
-                              <span className="font-black mr-2">{r.name}</span>
-                              <span className="text-sky-600 font-bold">[{r.id}]</span>
-                              <span className={`ml-2 uppercase ${mutedText}`}>
-                                {MAPS[r.mapId]?.name} • {r.mode.toUpperCase()}
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => handleDeploy(r.id)}
-                              className="px-3 py-1 bg-sky-600 text-white font-black uppercase cursor-pointer"
-                            >
-                              Join ({r.playerCount}/{r.maxPlayers})
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Preferred Side / Team Selection for 2+ Player Rooms */}
-                {(roomAction === "join" || mode === "tdm" || mode === "domination") && (
-                  <div
-                    className={`pt-3 border-t ${
-                      isLight ? "border-slate-200" : "border-white/10"
-                    }`}
-                  >
-                    <div className={`text-[10px] font-black uppercase tracking-[0.18em] mb-2 ${mutedText}`}>
-                      Choose Your Side / Squad (2+ Players)
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          soundEngine.playClick();
-                          setPreferredTeam("auto");
-                        }}
-                        className={`py-2 px-2 border text-xs font-black uppercase cursor-pointer ${
-                          preferredTeam === "auto"
-                            ? "bg-slate-800 border-slate-700 text-white"
-                            : subCardBg
-                        }`}
-                      >
-                        Auto Balance
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          soundEngine.playClick();
-                          setPreferredTeam("blue");
-                        }}
-                        className={`py-2 px-2 border text-xs font-black uppercase cursor-pointer ${
-                          preferredTeam === "blue"
-                            ? "bg-blue-600 border-blue-500 text-white"
-                            : subCardBg
-                        }`}
-                      >
-                        Blue Strike
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          soundEngine.playClick();
-                          setPreferredTeam("red");
-                        }}
-                        className={`py-2 px-2 border text-xs font-black uppercase cursor-pointer ${
-                          preferredTeam === "red"
-                            ? "bg-red-600 border-red-500 text-white"
-                            : subCardBg
-                        }`}
-                      >
-                        Red Vanguard
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* 2. Arena Map & Game Mode Configuration */}
-            {(playMode === "solo" || (playMode === "room" && roomAction === "create")) && (
-              <section className={`border p-4 sm:p-5 space-y-4 ${cardBg}`}>
-                <div>
-                  <h2 className={`text-xs font-black uppercase tracking-[0.22em] mb-2.5 ${mutedText}`}>
-                    2. Select Tactical Arena Map ({MAP_ORDER.length} Maps)
-                  </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
-                    {MAP_ORDER.map((id, idx) => {
-                      const m = MAPS[id];
-                      const active = mapId === id;
-                      return (
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="ROOM CODE (e.g. X7K2P)"
+                          value={roomCodeInput}
+                          onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
+                          className="flex-1 px-3 py-2 bg-[#141a29] border border-white/15 text-xs font-black uppercase tracking-widest outline-none"
+                        />
                         <button
-                          key={id}
-                          onClick={() => {
-                            soundEngine.playClick();
-                            setMapId(id);
-                          }}
-                          className={`p-3 border text-left cursor-pointer transition-all ${
-                            idx === 0 ? "sm:col-span-2" : ""
-                          } ${
-                            active
-                              ? isLight
-                                ? "bg-sky-50 border-sky-600 text-sky-950"
-                                : "bg-sky-500/15 border-sky-400 text-white"
-                              : subCardBg
-                          }`}
+                          type="button"
+                          onClick={() => handleDeploy()}
+                          className="px-4 py-2 bg-amber-500 text-slate-950 text-xs font-black uppercase cursor-pointer"
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-black uppercase">{m.name}</span>
-                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-sky-500/15 text-sky-600">
-                              {m.isDaylight ? "DAYLIGHT" : "NIGHT"}
-                            </span>
-                          </div>
-                          <div className={`text-[10px] mt-0.5 ${mutedText}`}>{m.subtitle}</div>
+                          Join
                         </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div
-                  className={`grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t ${
-                    isLight ? "border-slate-200" : "border-white/10"
-                  }`}
-                >
-                  <div>
-                    <div className={`text-xs font-black uppercase tracking-[0.18em] mb-2 ${mutedText}`}>
-                      Game Mode
+                      </div>
+                      {rooms.length > 0 && (
+                        <div className="space-y-1 max-h-28 overflow-y-auto">
+                          {rooms.map((r) => (
+                            <div
+                              key={r.id}
+                              className="flex items-center justify-between px-2.5 py-1.5 bg-[#141a29] border border-white/10 text-[11px]"
+                            >
+                              <span className="truncate font-bold">
+                                {r.name} [{r.id}] • {r.mode.toUpperCase()}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeploy(r.id)}
+                                className="px-2.5 py-1 bg-cyan-500 text-slate-950 font-black uppercase cursor-pointer"
+                              >
+                                Join ({r.playerCount}/{r.maxPlayers})
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                      {(
-                        [
-                          { id: "tdm", label: "TDM" },
-                          { id: "ffa", label: "FFA" },
-                          { id: "domination", label: "Zones" },
-                          { id: "br", label: "Royale" },
-                        ] as Array<{ id: GameMode; label: string }>
-                      ).map((gm) => (
+                  )}
+
+                  {(roomAction === "join" || mode === "tdm" || mode === "domination") && (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(["auto", "blue", "red"] as const).map((t) => (
                         <button
-                          key={gm.id}
-                          onClick={() => {
-                            soundEngine.playClick();
-                            setMode(gm.id);
-                          }}
-                          className={`py-2 px-1 text-[11px] font-black uppercase border cursor-pointer ${
-                            mode === gm.id
-                              ? "bg-amber-500 border-amber-400 text-slate-950"
-                              : subCardBg
+                          key={t}
+                          type="button"
+                          onClick={() => setPreferredTeam(t)}
+                          className={`py-1.5 text-[10px] font-black uppercase border cursor-pointer ${
+                            preferredTeam === t
+                              ? t === "blue"
+                                ? "bg-blue-600 border-blue-400 text-white"
+                                : t === "red"
+                                  ? "bg-red-600 border-red-400 text-white"
+                                  : "bg-slate-700 border-slate-500 text-white"
+                              : "bg-[#141a29] border-white/10 text-slate-400"
                           }`}
                         >
-                          {gm.label}
+                          {t === "auto" ? "Auto Team" : t === "blue" ? "Blue Strike" : "Red Vanguard"}
                         </button>
                       ))}
                     </div>
-                  </div>
-
-                  <div>
-                    <div className={`flex justify-between text-xs font-black uppercase tracking-[0.15em] mb-1.5 ${mutedText}`}>
-                      <span>Combat Bots</span>
-                      <span className={botCount === 0 ? "text-sky-500 font-black" : "text-emerald-600 font-black"}>
-                        {botCount === 0 ? "0 BOTS (PURE PRO PVP)" : `${botCount} BOTS`}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={8}
-                      step={1}
-                      value={botCount}
-                      onChange={(e) => setBotCount(parseInt(e.target.value, 10))}
-                      className="w-full accent-sky-500 cursor-pointer"
-                    />
-                    <div className="flex items-center justify-between mt-1.5 text-[10px] font-black uppercase">
-                      <span className={mutedText}>Sprint Style:</span>
-                      <button
-                        onClick={() => setSprintMode(sprintMode === "hold" ? "toggle" : "hold")}
-                        className="px-2 py-0.5 bg-sky-500/15 text-sky-600 border border-sky-500/30 cursor-pointer"
-                      >
-                        {sprintMode === "hold" ? "Hold Shift" : "Tap Toggle"}
-                      </button>
-                    </div>
-                  </div>
+                  )}
                 </div>
-              </section>
-            )}
+              )}
 
-            {/* 3. Primary Weapon Armory */}
-            <section className={`border p-4 sm:p-5 ${cardBg}`}>
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h2 className={`text-xs font-black uppercase tracking-[0.22em] ${mutedText}`}>
-                  3. Starting Weapon Loadout (All {WEAPON_ORDER.length} In-Game)
-                </h2>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playClick();
-                      setArmoryModalOpen(true);
-                    }}
-                    className="flex items-center gap-1 text-[11px] font-black uppercase text-amber-500 hover:underline cursor-pointer"
-                  >
-                    <RotateCw size={13} /> 360° Inspect
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => soundEngine.playWeaponFire(weaponId)}
-                    className="flex items-center gap-1 text-[11px] font-black uppercase text-sky-600 hover:underline cursor-pointer"
-                  >
-                    <Volume2 size={14} /> Test Fire
-                  </button>
+              {/* Game Mode Selector */}
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                  Combat Mode
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
-                {WEAPON_ORDER.map((wId) => {
-                  const w = WEAPONS[wId];
-                  const active = weaponId === wId;
-                  return (
+                <div className="grid grid-cols-4 gap-2">
+                  {(
+                    [
+                      { id: "br", label: "Royale" },
+                      { id: "tdm", label: "TDM" },
+                      { id: "ffa", label: "FFA" },
+                      { id: "domination", label: "Zones" },
+                    ] as Array<{ id: GameMode; label: string }>
+                  ).map((gm) => (
                     <button
-                      key={wId}
+                      key={gm.id}
+                      type="button"
                       onClick={() => {
-                        setWeaponId(wId);
-                        soundEngine.playWeaponFire(wId);
+                        soundEngine.playClick();
+                        setMode(gm.id);
+                        if (gm.id === "br" && playMode === "solo" && botCount < 6) {
+                          setBotCount(9);
+                        }
                       }}
-                      className={`p-2 border text-left cursor-pointer transition-all ${
-                        active
-                          ? isLight
-                            ? "bg-slate-900 border-slate-900 text-white"
-                            : "bg-white/15 border-white text-white"
-                          : subCardBg
+                      className={`py-2.5 text-xs font-black uppercase border cursor-pointer ${
+                        mode === gm.id
+                          ? "bg-amber-500 border-amber-400 text-slate-950"
+                          : "bg-[#111622] border-white/10 text-slate-300 hover:border-amber-400/50"
                       }`}
-                      style={
-                        active ? { borderLeftWidth: "4px", borderLeftColor: w.accentColor } : undefined
-                      }
                     >
-                      <div className="flex items-center justify-between text-[9px] font-bold uppercase opacity-70">
-                        <span className="truncate">{w.category}</span>
-                        <span>[{w.slot}]</span>
-                      </div>
-                      <div className="text-xs font-black uppercase truncate">{w.shortName}</div>
+                      {gm.label}
                     </button>
-                  );
-                })}
-              </div>
-
-              <div
-                className={`mt-3 p-2.5 border flex flex-wrap items-center justify-between gap-2 text-xs ${
-                  isLight ? "bg-slate-50 border-slate-200" : "bg-slate-900/80 border-white/10"
-                }`}
-              >
-                <span className="opacity-80">{selectedWeapon.description}</span>
-                <div className="flex gap-3 font-black uppercase text-[11px]">
-                  <span className="text-rose-500">
-                    DMG: {selectedWeapon.damage}
-                    {selectedWeapon.pellets > 1 ? `x${selectedWeapon.pellets}` : ""}
-                  </span>
-                  <span className="text-sky-600">MAG: {selectedWeapon.magSize}</span>
-                  <span className="text-emerald-600">RNG: {selectedWeapon.range}m</span>
+                  ))}
                 </div>
               </div>
-            </section>
-          </div>
 
-          {/* RIGHT COLUMN (5 cols): 3D Operator Preview, Skins, Character Selector & Launch CTA */}
-          <div className="lg:col-span-5 flex flex-col gap-4">
-            {/* Live 3D Operator / 360° Weapon Showcase */}
-            <section
-              className={`relative h-80 sm:h-96 border overflow-hidden flex flex-col ${
-                isLight
-                  ? "bg-gradient-to-b from-sky-100 via-sky-50 to-slate-200 border-slate-300"
-                  : "bg-gradient-to-b from-slate-900 to-slate-950 border-white/15"
-              }`}
-            >
-              {/* Showcase Switcher Bar */}
-              <div className="flex items-center justify-between px-3 py-2 border-b border-current/10 z-20 bg-slate-950/85 text-white">
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playClick();
-                      setShowcaseMode("operator");
-                    }}
-                    className={`px-2.5 py-1 text-[10px] font-black uppercase cursor-pointer transition-colors ${
-                      showcaseMode === "operator"
-                        ? "bg-sky-600 text-white"
-                        : "bg-slate-800 text-slate-300 hover:text-white"
-                    }`}
-                  >
-                    Operator 3D
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playClick();
-                      setShowcaseMode("weapon");
-                    }}
-                    className={`px-2.5 py-1 text-[10px] font-black uppercase flex items-center gap-1 cursor-pointer transition-colors ${
-                      showcaseMode === "weapon"
-                        ? "bg-amber-500 text-slate-950"
-                        : "bg-slate-800 text-slate-300 hover:text-white"
-                    }`}
-                  >
-                    <RotateCw size={11} /> Weapon 360°
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playClick();
-                    setArmoryModalOpen(true);
-                  }}
-                  className="px-2 py-1 text-[10px] font-black uppercase bg-slate-800 hover:bg-slate-700 text-sky-400 flex items-center gap-1 cursor-pointer"
-                >
-                  <Maximize2 size={11} /> Full 360° Armory
-                </button>
-              </div>
-
-              {showcaseMode === "weapon" ? (
-                <div className="flex-1 min-h-0">
-                  <WeaponInspector3D
-                    weaponId={weaponId}
-                    skinId={skinId}
-                    compact
-                    onExpand={() => setArmoryModalOpen(true)}
+              {/* AI Bots Slider */}
+              {(playMode === "solo" || (playMode === "room" && roomAction === "create")) && (
+                <div>
+                  <div className="flex justify-between text-[11px] font-black uppercase mb-1.5">
+                    <span className="text-slate-400">Combat AI Operators</span>
+                    <span className="text-amber-400 font-mono">
+                      {botCount === 0 ? "0 BOTS (PURE PVP)" : `${botCount} AI OPERATORS`}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={playMode === "solo" ? 1 : 0}
+                    max={mode === "br" ? 15 : 10}
+                    step={1}
+                    value={botCount}
+                    onChange={(e) => setBotCount(parseInt(e.target.value, 10))}
+                    className="w-full accent-amber-500 cursor-pointer"
                   />
                 </div>
-              ) : (
-                <div className="relative flex-1">
-                  <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-sky-600 text-[10px] font-black uppercase tracking-widest text-white">
-                      {selectedChar.codename}
-                    </span>
-                    <span className="text-xs font-black uppercase opacity-80">
-                      {selectedSkin.name}
-                    </span>
-                  </div>
+              )}
 
-                  <Canvas camera={{ position: [0, 0.55, 3.0], fov: 42 }}>
-                    <ambientLight intensity={isLight ? 1.1 : 0.75} />
-                    <directionalLight position={[3, 5, 4]} intensity={isLight ? 2.0 : 1.7} />
-                    <pointLight position={[-3, 2, 2]} intensity={0.8} color="#38bdf8" />
-                    <Suspense fallback={null}>
-                      <RotatingOperatorPreview
-                        characterId={characterId}
-                        skinId={skinId}
-                        weaponId={weaponId}
-                      />
-                    </Suspense>
-                  </Canvas>
-
-                  <div
-                    className={`absolute bottom-0 inset-x-0 p-3.5 ${
-                      isLight
-                        ? "bg-gradient-to-t from-white via-white/90 to-transparent text-slate-900"
-                        : "bg-gradient-to-t from-slate-950 via-slate-950/85 to-transparent text-white"
-                    }`}
-                  >
-                    <div className="text-sm font-black uppercase">{selectedChar.name}</div>
-                    <p className="text-[11px] opacity-80">{selectedChar.description}</p>
-                  </div>
+              {/* Map Selection Grid */}
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                  Select Combat Theater
                 </div>
-              )}
-            </section>
-
-            {/* Character Skins Picker */}
-            <section className={`border p-3.5 ${cardBg}`}>
-              <div className={`text-[11px] font-black uppercase tracking-[0.2em] mb-2 flex items-center gap-1.5 ${mutedText}`}>
-                <Palette size={13} className="text-sky-600" />
-                Tactical Uniform Skin
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {SKIN_ORDER.map((sId) => {
-                  const sk = CHARACTER_SKINS[sId];
-                  const active = skinId === sId;
-                  return (
-                    <button
-                      key={sId}
-                      onClick={() => {
-                        soundEngine.playClick();
-                        setSkinId(sId);
-                        persistSkinId(sId);
-                      }}
-                      className={`px-2 py-1.5 border text-[10px] font-black uppercase flex items-center gap-1.5 cursor-pointer ${
-                        active
-                          ? "border-sky-600 bg-sky-500/15"
-                          : subCardBg
-                      }`}
-                    >
-                      <span
-                        className="w-3 h-3 rounded-full shrink-0 border border-black/20"
-                        style={{ backgroundColor: sk.uniformPrimary }}
-                      />
-                      <span className="truncate">{sk.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* Operator Class Picker */}
-            <section className={`border p-3.5 ${cardBg}`}>
-              <div className={`text-[11px] font-black uppercase tracking-[0.2em] mb-2 flex items-center justify-between ${mutedText}`}>
-                <span className="flex items-center gap-1.5">
-                  <Shield size={13} className="text-sky-600" />
-                  Operator Class ({CHARACTER_ORDER.length})
-                </span>
-                <span className="text-[9px] font-bold tracking-wider opacity-75">
-                  Unified Tactical Rig
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-1.5">
-                {CHARACTER_ORDER.map((cId) => {
-                  const c = CHARACTERS[cId];
-                  const active = characterId === cId;
-                  return (
-                    <button
-                      key={cId}
-                      onClick={() => {
-                        soundEngine.playClick();
-                        setCharacterId(cId);
-                      }}
-                      className={`p-2 border text-left cursor-pointer transition-all ${
-                        active
-                          ? isLight
-                            ? "bg-sky-50 border-sky-600 text-sky-950"
-                            : "bg-sky-500/15 border-sky-400 text-white"
-                          : subCardBg
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-[11px] font-black uppercase truncate">{c.codename}</span>
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: c.visorColor }}
-                        />
-                      </div>
-                      <div className={`text-[9px] uppercase mt-0.5 truncate ${mutedText}`}>
-                        {c.maxHealth} HP • {Math.round(c.speedMult * 100)}%
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* Launch Match Button */}
-            <button
-              onClick={() => handleDeploy()}
-              className={`w-full py-4.5 text-white font-black text-xl uppercase tracking-[0.22em] flex items-center justify-center gap-3 shadow-lg cursor-pointer transition-transform active:scale-[0.99] ${
-                playMode !== "solo" && !firebaseUser
-                  ? "bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 hover:brightness-110"
-                  : "bg-gradient-to-r from-sky-600 via-sky-500 to-cyan-500 hover:brightness-110"
-              }`}
-            >
-              {playMode !== "solo" && !firebaseUser ? (
-                <>
-                  <LogIn size={22} />
-                  <span>Sign In To Deploy</span>
-                </>
-              ) : (
-                <>
-                  <Play size={24} fill="currentColor" />
-                  <span>Deploy S-G-3D</span>
-                  <Crosshair size={20} />
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* OPERATORS DIRECTORY & RECENT MATCH RESULTS BAR */}
-        <section className={`border p-4 grid grid-cols-1 lg:grid-cols-2 gap-4 ${cardBg}`}>
-          {/* Entered Operators Snapshot */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest">
-                <Users size={14} className="text-sky-500" />
-                <span>Entered Operators ({lobbyOperators.length})</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine.playClick();
-                  setLeaderboardTab("players");
-                  setActiveModal("leaderboard");
-                }}
-                className="text-[10px] font-black uppercase text-sky-500 hover:underline cursor-pointer"
-              >
-                View All Players
-              </button>
-            </div>
-            {!firebaseUser ? (
-              <div className={`p-3 border text-xs ${subCardBg}`}>
-                Sign in with Google to view all entered players & live ranked standings.
-              </div>
-            ) : lobbyOperators.length === 0 ? (
-              <div className={`p-3 border text-xs ${subCardBg}`}>
-                Loading registered operators...
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {lobbyOperators.slice(0, 6).map((op, i) => (
-                  <div
-                    key={op.uid}
-                    className={`px-2.5 py-1.5 border flex items-center justify-between text-xs ${subCardBg}`}
-                  >
-                    <div className="truncate">
-                      <span className="font-black text-amber-500 mr-1.5">#{i + 1}</span>
-                      <span className="font-bold">{op.username}</span>
-                    </div>
-                    <div className="text-[10px] font-black text-sky-500 shrink-0 ml-2">
-                      {op.rankPoints} PTS • {op.kills}K
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Recent Match Results Snapshot */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest">
-                <History size={14} className="text-emerald-500" />
-                <span>Recent Match Results ({recentMatches.length})</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine.playClick();
-                  setLeaderboardTab("history");
-                  setActiveModal("leaderboard");
-                }}
-                className="text-[10px] font-black uppercase text-emerald-500 hover:underline cursor-pointer"
-              >
-                Full Results Board
-              </button>
-            </div>
-            {recentMatches.length === 0 ? (
-              <div className={`p-3 border text-xs ${subCardBg}`}>
-                No matches finished yet. Deploy to record your match score, MVP, and K/D history!
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {recentMatches.slice(0, 4).map((m) => (
-                  <div
-                    key={m.id}
-                    className={`px-2.5 py-1.5 border flex items-center justify-between text-xs ${subCardBg}`}
-                  >
-                    <div className="truncate">
-                      <span
-                        className={`px-1.5 py-0.2 text-[9px] font-black uppercase mr-1.5 ${
-                          m.didWin ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {MAP_ORDER.map((id, idx) => {
+                    const m = MAPS[id];
+                    const active = mapId === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => {
+                          soundEngine.playClick();
+                          setMapId(id);
+                          if (id === "royale_valley") setMode("br");
+                        }}
+                        className={`p-3 border text-left cursor-pointer transition-all ${
+                          idx === 0 ? "sm:col-span-2" : ""
+                        } ${
+                          active
+                            ? "bg-amber-500/20 border-amber-400 text-white"
+                            : "bg-[#111622] border-white/10 text-slate-300 hover:border-white/30"
                         }`}
                       >
-                        {m.didWin ? "WIN" : "LOSS"}
-                      </span>
-                      <span className="font-bold">{m.mapName}</span>
-                    </div>
-                    <div className="text-[10px] font-black opacity-80 shrink-0 ml-2">
-                      {m.kills}K/{m.deaths}D • {m.scoreText}
-                    </div>
-                  </div>
-                ))}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-black uppercase">{m.name}</span>
+                          <span className="text-[9px] font-black font-mono uppercase text-cyan-400">
+                            {m.floor.width}m • {m.isDaylight ? "DAY" : "NIGHT"}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{m.subtitle}</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            )}
+            </div>
+
+            <div className="p-4 bg-[#0d121d] border-t border-white/10 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  setOpenDrawer(null);
+                }}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black uppercase tracking-[0.2em] text-sm cursor-pointer clip-tactical-btn"
+              >
+                Confirm Mission
+              </button>
+            </div>
           </div>
-        </section>
-      </div>
+        </div>
+      )}
+
+      {/* SLIDE-OVER DRAWER 2: OPERATORS & TACTICAL SKINS */}
+      {openDrawer === "operator" && (
+        <div
+          className="fixed inset-0 z-50 bg-black/65 flex justify-end"
+          onClick={() => setOpenDrawer(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md h-dvh bg-[#090d16] border-l border-cyan-500/35 flex flex-col shadow-2xl"
+          >
+            <div className="px-5 py-4 bg-[#0d121d] border-b border-white/10 flex items-center justify-between shrink-0">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">
+                  Special Forces Roster
+                </div>
+                <h2 className="text-lg font-black uppercase tracking-wider">
+                  Operators & Camo Skins
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenDrawer(null)}
+                className="p-2 bg-white/5 hover:bg-amber-500 hover:text-slate-950 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              {/* Operators */}
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                  Select Operator ({CHARACTER_ORDER.length})
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {CHARACTER_ORDER.map((cId) => {
+                    const c = CHARACTERS[cId];
+                    const active = characterId === cId;
+                    return (
+                      <button
+                        key={cId}
+                        type="button"
+                        onClick={() => {
+                          soundEngine.playClick();
+                          setCharacterId(cId);
+                        }}
+                        className={`p-3 border text-left cursor-pointer transition-all ${
+                          active
+                            ? "bg-amber-500/20 border-amber-400 text-white"
+                            : "bg-[#111622] border-white/10 text-slate-300 hover:border-white/30"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black uppercase">{c.codename}</span>
+                          <span className="text-[9px] font-mono text-cyan-300">{c.maxHealth} HP</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5 truncate">{c.role}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Operator Passive Bio */}
+              <div className="p-3 bg-[#111622] border border-white/10 text-xs">
+                <div className="flex items-center gap-1.5 font-black uppercase text-amber-400 mb-1">
+                  <Shield size={13} /> {selectedChar.codename} — {selectedChar.role}
+                </div>
+                <p className="text-[11px] text-slate-300">{selectedChar.passive}</p>
+              </div>
+
+              {/* Tactical Camo Skins */}
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                  Uniform & Armor Camo ({SKIN_ORDER.length})
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {SKIN_ORDER.map((sId) => {
+                    const sk = CHARACTER_SKINS[sId];
+                    const active = skinId === sId;
+                    return (
+                      <button
+                        key={sId}
+                        type="button"
+                        onClick={() => {
+                          soundEngine.playClick();
+                          setSkinId(sId);
+                          persistSkinId(sId);
+                        }}
+                        className={`p-2.5 border text-left flex items-center gap-2.5 cursor-pointer transition-all ${
+                          active
+                            ? "bg-cyan-500/20 border-cyan-400 text-white"
+                            : "bg-[#111622] border-white/10 text-slate-300 hover:border-white/30"
+                        }`}
+                      >
+                        <span
+                          className="w-5 h-5 border border-white/30 shrink-0"
+                          style={{ backgroundColor: sk.primary }}
+                        />
+                        <div className="min-w-0">
+                          <div className="text-xs font-black uppercase truncate">{sk.name}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-[#0d121d] border-t border-white/10 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playClick();
+                  setOpenDrawer(null);
+                }}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black uppercase tracking-[0.2em] text-sm cursor-pointer clip-tactical-btn"
+              >
+                Equip Operator
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 };

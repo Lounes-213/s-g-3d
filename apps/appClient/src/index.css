@@ -1,13 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  --font-inter: "Inter", sans-serif;
-  --font-tactical: "Rajdhani", "Inter", sans-serif;
+  --font-display: "Chakra Petch", sans-serif;
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-tactical: "Chakra Petch", sans-serif;
 }
 
-html {
-  scrollbar-gutter: stable;
-  background-color: #090d16;
+html,
+body {
+  background-color: #080a0f;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 h1,
@@ -16,11 +21,44 @@ h3,
 h4,
 h5,
 h6 {
+  font-family: "Chakra Petch", sans-serif;
   text-wrap: balance;
 }
 
 p {
   text-wrap: pretty;
+}
+
+/* Signature AAA Chamfered Tactical Corners */
+.clip-tactical {
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
+}
+
+.clip-tactical-sm {
+  clip-path: polygon(
+    6px 0,
+    100% 0,
+    100% calc(100% - 6px),
+    calc(100% - 6px) 100%,
+    0 100%,
+    0 6px
+  );
+}
+
+.clip-tactical-btn {
+  clip-path: polygon(
+    12px 0,
+    100% 0,
+    calc(100% - 12px) 100%,
+    0 100%
+  );
 }
 
 :root {
@@ -29,18 +67,18 @@ p {
   }
 }
 
-/* Custom sleek tactical scrollbar */
+/* Precision obsidian & amber scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(9, 12, 18, 0.7);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(56, 189, 248, 0.4);
-  border-radius: 3px;
+  background: rgba(245, 158, 11, 0.45);
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(56, 189, 248, 0.7);
+  background: rgba(245, 158, 11, 0.8);
 }
