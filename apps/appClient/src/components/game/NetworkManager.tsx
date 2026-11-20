@@ -103,8 +103,10 @@ const NetworkManager = () => {
           st.triggerDamageFlash();
         }
 
-        st.setPlayers(players || {});
-        st.updateMatchData(matchInfo as Partial<ReturnType<typeof useGameStore.getState>>);
+        st.setServerSnapshot(
+          players || {},
+          matchInfo as Partial<ReturnType<typeof useGameStore.getState>>,
+        );
 
         if (matchInfo.matchState === "playing") {
           recordedMatchEndRef.current = false;

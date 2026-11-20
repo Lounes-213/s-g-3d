@@ -36,7 +36,7 @@ const SkyBox = () => {
   const shadowCam = Math.min(155, Math.max(85, mapSpan * 0.54));
   const fogNear = Math.max(95, mapSpan * 0.42);
   const fogFar = Math.max(255, mapSpan * 1.38);
-  const shadowSize = quality === "high" ? 2048 : quality === "medium" ? 1024 : 512;
+  const shadowSize = quality === "high" ? 1024 : quality === "medium" ? 768 : 512;
 
   return (
     <>
@@ -85,7 +85,7 @@ const SkyBox = () => {
         shadow-camera-top={shadowCam}
         shadow-camera-bottom={-shadowCam}
         shadow-camera-near={5}
-        shadow-camera-far={340}
+        shadow-camera-far={240}
         shadow-bias={-0.0005}
       />
       {/* Cool opposing sky rim fill for realistic GTA-style sunlit shading */}

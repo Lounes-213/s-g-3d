@@ -61,6 +61,9 @@ async function startServer() {
       origin: "*",
       methods: ["GET", "POST"],
     },
+    transports: ["websocket", "polling"],
+    perMessageDeflate: false,
+    httpCompression: false,
   });
 
   expressServer.listen(PORT, "0.0.0.0", () => {

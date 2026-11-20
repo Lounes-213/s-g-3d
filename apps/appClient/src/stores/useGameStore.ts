@@ -242,6 +242,7 @@ export type GameStore = {
   setPing: (ping: number) => void;
   setPlayers: (players: Record<string, PlayerState>) => void;
   updateMatchData: (data: Partial<GameStore>) => void;
+  setServerSnapshot: (players: Record<string, PlayerState>, matchData?: Partial<GameStore>) => void;
 
   isLocked: boolean;
   setLocked: (locked: boolean) => void;
@@ -410,6 +411,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   setPlayers: (players) => set({ players }),
   updateMatchData: (data) => set((state) => ({ ...state, ...data })),
+  setServerSnapshot: (players, matchData) =>
+    set((state) => ({
+      ...state,
+      players,
+      ...(matchData || {}),
+    })),
 
   isLocked: false,
   setLocked: (locked) => set({ isLocked: locked }),
@@ -564,6 +571,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }),
   pruneVfx: () =>
     set((state) => {
+      if (
+        state.tracers.length === 0 &&
+        state.explosions.length === 0 &&
+        state.muzzleFlashes.length === 0 &&
+        state.hitSparks.length === 0 &&
+        state.shellCasings.length === 0 &&
+        state.damagePopups.length === 0 &&
+        state.dealtPopups.length === 0 &&
+        state.takenPopups.length === 0
+      ) {
+        return state;
+      }
       const now = Date.now();
       return {
         tracers: state.tracers.filter((t) => now - t.createdAt < 230),

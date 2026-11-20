@@ -58,7 +58,7 @@ const PrimaryCanvas = () => {
 
   const bgHex = theme === "light" ? "#cbe6ff" : "#090d16";
   const dpr: [number, number] =
-    graphicsQuality === "low" ? [0.75, 1] : graphicsQuality === "high" ? [1, 1.8] : [1, 1.35];
+    graphicsQuality === "low" ? [0.75, 1] : graphicsQuality === "high" ? [1, 1.35] : [0.85, 1.15];
 
   return (
     <div className="relative w-full h-full" style={{ backgroundColor: bgHex }}>
@@ -80,7 +80,12 @@ const PrimaryCanvas = () => {
       <Canvas
         shadows={graphicsQuality !== "low"}
         dpr={dpr}
-        gl={{ antialias: graphicsQuality !== "low", powerPreference: "high-performance" }}
+        gl={{
+          antialias: graphicsQuality === "high",
+          powerPreference: "high-performance",
+          stencil: false,
+          depth: true,
+        }}
         style={{ backgroundColor: bgHex }}
       >
         <color attach="background" args={[bgHex]} />

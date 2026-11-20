@@ -1,11 +1,11 @@
-import { Suspense, useRef } from "react";
+import { Suspense, useRef, memo } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { useGameStore, type PlayerState } from "../../stores/useGameStore";
 import RemotePlayersUI from "./ui/RemotePlayersUI";
 import { CharacterModel3D } from "./CharacterModel3D";
 
-const RemotePlayerItem = ({
+const RemotePlayerItem = memo(({
   pos,
   lastHitAt,
   lastHitHeadshot,
@@ -58,7 +58,7 @@ const RemotePlayerItem = ({
       <RemotePlayersUI player={pos} />
     </group>
   );
-};
+});
 
 const RemotePlayers = () => {
   const players = useGameStore((state) => state.players);

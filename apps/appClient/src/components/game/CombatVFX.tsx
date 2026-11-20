@@ -392,7 +392,7 @@ export default function CombatVFX() {
   const pruneVfx = useGameStore((state) => state.pruneVfx);
 
   useEffect(() => {
-    const id = setInterval(pruneVfx, 90);
+    const id = setInterval(pruneVfx, 140);
     return () => clearInterval(id);
   }, [pruneVfx]);
 

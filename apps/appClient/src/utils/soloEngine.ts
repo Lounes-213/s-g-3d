@@ -1522,8 +1522,7 @@ class SoloGameEngine {
       };
     });
 
-    useGameStore.getState().setPlayers(out);
-    useGameStore.getState().updateMatchData({
+    useGameStore.getState().setServerSnapshot(out, {
       matchState: this.matchState,
       timeRemaining: this.timeRemaining,
       teamScores: { ...this.teamScores },
