@@ -188,6 +188,9 @@ export default function WeaponViewModel() {
 
   return (
     <group ref={groupRef} scale={[scale, scale, scale]}>
+      {/* Dedicated Viewmodel Key & Fill Lights for guaranteed 1P gun & hands visibility in all theaters */}
+      <ambientLight intensity={0.95} />
+      <directionalLight position={[0.4, 1.0, 0.4]} intensity={1.8} />
       <WeaponModel3D
         weaponId={currentWeapon}
         isReloading={isReloading}

@@ -91,32 +91,11 @@ export function useIdleSway(isAiming: boolean) {
 }
 
 export function useRecoil() {
-  const recoilZ = useRef(0);
-  const recoilY = useRef(0);
-  const recoilRotX = useRef(0);
-
-  useEffect(() => {
-    const onShoot = (ev: Event) => {
-      const detail = (ev as CustomEvent<{ kick?: number }>).detail;
-      const kick = detail?.kick ?? 1.0;
-      recoilZ.current = Math.min(recoilZ.current + 0.08 * kick, 0.24);
-      recoilY.current = Math.min(recoilY.current + 0.015 * kick, 0.045);
-      recoilRotX.current = Math.min(recoilRotX.current + 0.055 * kick, 0.16);
-    };
-
-    window.addEventListener("weapon-fired", onShoot);
-    return () => window.removeEventListener("weapon-fired", onShoot);
-  }, []);
-
   const update = () => {
-    recoilZ.current = MathUtils.lerp(recoilZ.current, 0, 0.18);
-    recoilY.current = MathUtils.lerp(recoilY.current, 0, 0.18);
-    recoilRotX.current = MathUtils.lerp(recoilRotX.current, 0, 0.1);
-
     return {
-      z: recoilZ.current,
-      y: Math.max(0, recoilY.current),
-      rotX: recoilRotX.current,
+      z: 0,
+      y: 0,
+      rotX: 0,
     };
   };
 

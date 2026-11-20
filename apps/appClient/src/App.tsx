@@ -2,13 +2,26 @@ import { useEffect } from "react";
 import { Outlet } from "react-router";
 import { Toaster } from "react-hot-toast";
 import { useAuthStore } from "./stores/useAuthStore";
+import { useSettingsStore } from "./stores/useSettingsStore";
 import SplashScreen from "./components/SplashScreen";
 
 function App() {
+  const theme = useSettingsStore((state) => state.theme);
+
   useEffect(() => {
     const unsub = useAuthStore.getState().initAuthListener();
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (theme === "dark") {
+      document.body.classList.add("theme-dark");
+      document.body.classList.remove("theme-light");
+    } else {
+      document.body.classList.add("theme-light");
+      document.body.classList.remove("theme-dark");
+    }
+  }, [theme]);
 
   return (
     <>

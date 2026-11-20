@@ -62,7 +62,9 @@ const LocalPlayerUI = () => {
 
   const keybindings = useSettingsStore((state) => state.keybindings);
   const perspective = useSettingsStore((state) => state.perspective);
+  const theme = useSettingsStore((state) => state.theme);
   const allAttachments = useSettingsStore((state) => state.weaponAttachments);
+  const isLight = theme === "light";
 
   const showControls = useAppStore((state) => state.showControls);
   const toggleControls = useAppStore((state) => state.toggleControls);
@@ -103,7 +105,9 @@ const LocalPlayerUI = () => {
       : 0;
   const outsideStorm = Boolean(mode === "br" && stormZone && distFromStorm > stormZone.currentRadius);
 
-  const panelClass = "bg-[#0a0d14]/90 border border-white/15 text-white shadow-xl clip-tactical-sm";
+  const panelClass = isLight
+    ? "bg-white/95 border border-slate-300 text-slate-900 shadow-xl clip-tactical-sm"
+    : "bg-[#0a0d14]/90 border border-white/15 text-white shadow-xl clip-tactical-sm";
 
   return (
     <>

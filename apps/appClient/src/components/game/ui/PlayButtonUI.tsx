@@ -42,6 +42,8 @@ const PlayButtonUI = () => {
 
   const perspective = useSettingsStore((state) => state.perspective);
   const togglePerspective = useSettingsStore((state) => state.togglePerspective);
+  const theme = useSettingsStore((state) => state.theme);
+  const isLight = theme === "light";
   const setSidebarOpen = useAppStore((state) => state.setSidebarOpen);
   const showControls = useAppStore((state) => state.showControls);
   const toggleControls = useAppStore((state) => state.toggleControls);
@@ -113,8 +115,14 @@ const PlayButtonUI = () => {
           : "opacity-100 bg-black/65 pointer-events-auto"
       }`}
     >
-      <div className="w-full max-w-2xl max-h-[92dvh] overflow-y-auto border border-amber-500/35 bg-[#090d16] text-white shadow-2xl p-5 md:p-6 clip-tactical">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-4 mb-4">
+      <div className={`w-full max-w-2xl max-h-[92dvh] overflow-y-auto border shadow-2xl p-5 md:p-6 clip-tactical ${
+        isLight
+          ? "bg-white text-slate-900 border-slate-300"
+          : "bg-[#090d16] text-white border-amber-500/35"
+      }`}>
+        <div className={`flex flex-wrap items-center justify-between gap-2 border-b pb-4 mb-4 ${
+          isLight ? "border-slate-200" : "border-white/10"
+        }`}>
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-400">
               S-G-3D {playMode.toUpperCase()} DEPLOYMENT

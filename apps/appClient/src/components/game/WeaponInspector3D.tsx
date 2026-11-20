@@ -510,22 +510,31 @@ export function WeaponArmoryModal({
   onSelectWeapon: (id: WeaponId) => void;
   skinId: SkinId;
 }) {
+  const theme = useSettingsStore((s) => s.theme);
+  const isLight = theme === "light";
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] bg-black/85 flex items-center justify-center p-2 sm:p-5">
-      <div className="w-full max-w-5xl h-[92dvh] max-h-[760px] bg-[#090d16] border border-amber-500/35 shadow-2xl overflow-hidden flex flex-col clip-tactical">
-        <div className="px-5 py-3 bg-[#0c101b] border-b border-white/10 flex items-center justify-between shrink-0">
+    <div className="fixed inset-0 z-[120] bg-black/80 flex items-center justify-center p-2 sm:p-5">
+      <div className={`w-full max-w-5xl h-[92dvh] max-h-[760px] border shadow-2xl overflow-hidden flex flex-col clip-tactical ${
+        isLight
+          ? "bg-slate-50 text-slate-900 border-slate-300"
+          : "bg-[#090d16] text-white border-amber-500/35"
+      }`}>
+        <div className={`px-5 py-3 border-b flex items-center justify-between shrink-0 ${
+          isLight ? "bg-white border-slate-200" : "bg-[#0c101b] border-white/10"
+        }`}>
           <div className="flex items-center gap-2.5">
-            <Crosshair size={18} className="text-amber-400" />
-            <h2 className="text-sm sm:text-base font-black uppercase tracking-[0.2em] text-white">
+            <Crosshair size={18} className="text-amber-500" />
+            <h2 className={`text-sm sm:text-base font-black uppercase tracking-[0.2em] ${isLight ? "text-slate-900" : "text-white"}`}>
               3D Gunsmith & Tactical Armory ({WEAPON_ORDER.length} Weapons)
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 bg-white/5 hover:bg-amber-500 hover:text-slate-950 text-slate-200 cursor-pointer transition-colors"
+            className="p-1.5 bg-black/5 hover:bg-amber-500 hover:text-slate-950 text-slate-400 cursor-pointer transition-colors"
           >
             <X size={18} />
           </button>

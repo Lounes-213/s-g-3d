@@ -9,10 +9,16 @@
 
 html,
 body {
-  background-color: #080a0f;
+  background-color: #f1f5f9;
+  color: #0f172a;
   font-family: "Plus Jakarta Sans", sans-serif;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+body.theme-dark {
+  background-color: #080a0f;
+  color: #f8fafc;
 }
 
 h1,

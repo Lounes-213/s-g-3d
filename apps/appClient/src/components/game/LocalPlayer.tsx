@@ -849,14 +849,12 @@ const LocalPlayer = () => {
         48,
       );
 
-      const crouchMult = movementState.crouch || movementState.isSliding ? 0.68 : 1.0;
-      const aimMult = combatState.isAiming ? 0.72 : 1.0;
-      const effKick = wpnStats.recoilKick * crouchMult * aimMult;
-      recoilPitchVel.current += effKick * 0.085;
+      const effKick = 0;
+      recoilPitchVel.current = 0;
 
       window.dispatchEvent(
         new CustomEvent("weapon-fired", {
-          detail: { kick: effKick },
+          detail: { kick: 0 },
         }),
       );
     };

@@ -130,7 +130,10 @@ const WelcomePage = () => {
     skinId: savedSkinId,
     setSkinId: persistSkinId,
     weaponAttachments,
+    theme,
   } = useSettingsStore();
+
+  const isLight = theme === "light";
 
   const { firebaseUser, profile, incomingRequests, roomInvites } = useAuthStore();
   const [signingInGoogle, setSigningInGoogle] = useState(false);
@@ -291,7 +294,9 @@ const WelcomePage = () => {
   return (
     <main
       id="main-content"
-      className="relative w-full h-dvh overflow-hidden bg-[#080a0f] text-white font-tactical select-none"
+      className={`relative w-full h-dvh overflow-hidden font-tactical select-none ${
+        isLight ? "bg-slate-100 text-slate-900" : "bg-[#080a0f] text-white"
+      }`}
     >
       <SideBar />
 
@@ -330,8 +335,9 @@ const WelcomePage = () => {
       <div
         className="absolute inset-0 z-0"
         style={{
-          background:
-            "radial-gradient(circle at 50% 42%, rgba(245,158,11,0.14) 0%, rgba(12,18,30,0.92) 48%, #06080d 100%)",
+          background: isLight
+            ? "radial-gradient(circle at 50% 42%, rgba(245,158,11,0.18) 0%, rgba(241,245,249,0.92) 52%, #e2e8f0 100%)"
+            : "radial-gradient(circle at 50% 42%, rgba(245,158,11,0.14) 0%, rgba(12,18,30,0.92) 48%, #06080d 100%)",
         }}
       >
         <Canvas
@@ -340,8 +346,8 @@ const WelcomePage = () => {
           camera={{ position: [0, 0.48, 3.65], fov: 40 }}
           gl={{ antialias: true, alpha: true }}
         >
-          <ambientLight intensity={0.9} />
-          <directionalLight position={[4, 7, 5]} intensity={2.4} color="#fff7ed" castShadow />
+          <ambientLight intensity={isLight ? 1.5 : 0.9} />
+          <directionalLight position={[4, 7, 5]} intensity={isLight ? 2.5 : 2.4} color="#fff7ed" castShadow />
           <directionalLight position={[-5, 3, -3]} intensity={1.3} color="#06b6d4" />
           <pointLight position={[0, 2.2, 2.5]} intensity={1.1} color="#f59e0b" />
           <Suspense fallback={null}>
@@ -365,8 +371,9 @@ const WelcomePage = () => {
       <div
         className="absolute inset-0 pointer-events-none z-10"
         style={{
-          background:
-            "linear-gradient(180deg, rgba(6,8,13,0.82) 0%, transparent 22%, transparent 68%, rgba(6,8,13,0.92) 100%)",
+          background: isLight
+            ? "linear-gradient(180deg, rgba(255,255,255,0.7) 0%, transparent 22%, transparent 68%, rgba(241,245,249,0.85) 100%)"
+            : "linear-gradient(180deg, rgba(6,8,13,0.82) 0%, transparent 22%, transparent 68%, rgba(6,8,13,0.92) 100%)",
         }}
       />
 
@@ -379,7 +386,9 @@ const WelcomePage = () => {
               SG
             </div>
             <div>
-              <h1 className="text-xl sm:text-3xl font-black tracking-[0.22em] uppercase leading-none text-white">
+              <h1 className={`text-xl sm:text-3xl font-black tracking-[0.22em] uppercase leading-none ${
+                isLight ? "text-slate-900" : "text-white"
+              }`}>
                 S-G-3D
               </h1>
               <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.22em] text-amber-400 mt-0.5">
@@ -397,7 +406,11 @@ const WelcomePage = () => {
                 soundEngine.playClick();
                 setActiveModal("account");
               }}
-              className="flex items-center gap-2 px-2.5 py-1.5 bg-[#0c101a]/92 border border-white/15 hover:border-amber-400 text-xs font-black uppercase cursor-pointer clip-tactical-sm"
+              className={`flex items-center gap-2 px-2.5 py-1.5 border hover:border-amber-400 text-xs font-black uppercase cursor-pointer clip-tactical-sm ${
+                isLight
+                  ? "bg-white/95 text-slate-800 border-slate-300 shadow-sm"
+                  : "bg-[#0c101a]/92 text-white border-white/15"
+              }`}
             >
               {firebaseUser ? (
                 <OperatorAvatar
@@ -421,7 +434,11 @@ const WelcomePage = () => {
                 setActiveModal("leaderboard");
               }}
               title="Leaderboard & Match History"
-              className="p-2 sm:px-3 sm:py-2 bg-[#0c101a]/92 border border-white/15 hover:border-amber-400 text-white text-xs font-black uppercase flex items-center gap-1.5 cursor-pointer clip-tactical-sm"
+              className={`p-2 sm:px-3 sm:py-2 border hover:border-amber-400 text-xs font-black uppercase flex items-center gap-1.5 cursor-pointer clip-tactical-sm ${
+                isLight
+                  ? "bg-white/95 text-slate-800 border-slate-300 shadow-sm"
+                  : "bg-[#0c101a]/92 text-white border-white/15"
+              }`}
             >
               <Trophy size={15} className="text-amber-400" />
               <span className="hidden md:inline">Ranks</span>
@@ -435,7 +452,11 @@ const WelcomePage = () => {
                 setActiveModal("leaderboard");
               }}
               title="Match History"
-              className="hidden sm:flex p-2 bg-[#0c101a]/92 border border-white/15 hover:border-cyan-400 text-white cursor-pointer clip-tactical-sm"
+              className={`hidden sm:flex p-2 border hover:border-cyan-400 cursor-pointer clip-tactical-sm ${
+                isLight
+                  ? "bg-white/95 text-slate-800 border-slate-300 shadow-sm"
+                  : "bg-[#0c101a]/92 text-white border-white/15"
+              }`}
             >
               <History size={15} className="text-cyan-400" />
             </button>
@@ -447,7 +468,11 @@ const WelcomePage = () => {
                 setActiveModal("friends");
               }}
               title="Friends & Squad Invites"
-              className="relative p-2 sm:px-3 sm:py-2 bg-[#0c101a]/92 border border-white/15 hover:border-cyan-400 text-white text-xs font-black uppercase flex items-center gap-1.5 cursor-pointer clip-tactical-sm"
+              className={`relative p-2 sm:px-3 sm:py-2 border hover:border-cyan-400 text-xs font-black uppercase flex items-center gap-1.5 cursor-pointer clip-tactical-sm ${
+                isLight
+                  ? "bg-white/95 text-slate-800 border-slate-300 shadow-sm"
+                  : "bg-[#0c101a]/92 text-white border-white/15"
+              }`}
             >
               <Users size={15} className="text-cyan-400" />
               <span className="hidden md:inline">Squad</span>
@@ -465,7 +490,11 @@ const WelcomePage = () => {
                 setMobileHudEditorOpen(true);
               }}
               title="Customize Mobile Touch Controls"
-              className="p-2 bg-[#0c101a]/92 border border-white/15 hover:border-amber-400 text-amber-400 cursor-pointer clip-tactical-sm"
+              className={`p-2 border hover:border-amber-400 text-amber-500 cursor-pointer clip-tactical-sm ${
+                isLight
+                  ? "bg-white/95 border-slate-300 shadow-sm"
+                  : "bg-[#0c101a]/92 border-white/15"
+              }`}
             >
               <Smartphone size={16} />
             </button>
@@ -477,7 +506,11 @@ const WelcomePage = () => {
                 toggleSidebar();
               }}
               title="Settings, Audio & Keybinds"
-              className="p-2 sm:px-3 sm:py-2 bg-[#0c101a]/92 border border-white/15 hover:border-amber-400 text-white text-xs font-black uppercase flex items-center gap-1.5 cursor-pointer clip-tactical-sm"
+              className={`p-2 sm:px-3 sm:py-2 border hover:border-amber-400 text-xs font-black uppercase flex items-center gap-1.5 cursor-pointer clip-tactical-sm ${
+                isLight
+                  ? "bg-white/95 text-slate-800 border-slate-300 shadow-sm"
+                  : "bg-[#0c101a]/92 text-white border-white/15"
+              }`}
             >
               <Settings size={15} />
               <span className="hidden sm:inline">Settings</span>
@@ -509,16 +542,20 @@ const WelcomePage = () => {
               soundEngine.playClick();
               setArmoryModalOpen(true);
             }}
-            className="group flex items-center justify-between gap-4 w-52 sm:w-64 px-4 py-3 bg-[#0a0e17]/90 hover:bg-[#121927] border border-white/15 hover:border-amber-400 text-left cursor-pointer transition-all clip-tactical-sm"
+            className={`group flex items-center justify-between gap-4 w-52 sm:w-64 px-4 py-3 border hover:border-amber-400 text-left cursor-pointer transition-all clip-tactical-sm ${
+              isLight
+                ? "bg-white/95 text-slate-900 border-slate-300 shadow-sm hover:bg-slate-50"
+                : "bg-[#0a0e17]/90 text-white border-white/15 hover:bg-[#121927]"
+            }`}
           >
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-amber-400">
+              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-amber-500">
                 <Wrench size={11} /> Armory & Gunsmith
               </div>
-              <div className="text-sm font-black uppercase truncate text-white mt-0.5">
+              <div className={`text-sm font-black uppercase truncate mt-0.5 ${isLight ? "text-slate-900" : "text-white"}`}>
                 {effWeapon.name}
               </div>
-              <div className="text-[10px] font-mono text-cyan-300 truncate">
+              <div className={`text-[10px] font-mono truncate ${isLight ? "text-cyan-700 font-bold" : "text-cyan-300"}`}>
                 {SCOPES[activeAtt.scope].shortName} {effWeapon.adsZoom.toFixed(1)}x • {effWeapon.magSize} MAG
               </div>
             </div>
@@ -534,17 +571,19 @@ const WelcomePage = () => {
             className={`group flex items-center justify-between gap-4 w-52 sm:w-64 px-4 py-3 border text-left cursor-pointer transition-all clip-tactical-sm ${
               openDrawer === "operator"
                 ? "bg-amber-500/20 border-amber-400"
-                : "bg-[#0a0e17]/90 hover:bg-[#121927] border-white/15 hover:border-amber-400"
+                : isLight
+                  ? "bg-white/95 text-slate-900 border-slate-300 hover:border-amber-400 shadow-sm hover:bg-slate-50"
+                  : "bg-[#0a0e17]/90 text-white border-white/15 hover:border-amber-400 hover:bg-[#121927]"
             }`}
           >
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-cyan-400">
+              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-cyan-500">
                 <User size={11} /> Operators & Skins
               </div>
-              <div className="text-sm font-black uppercase truncate text-white mt-0.5">
+              <div className={`text-sm font-black uppercase truncate mt-0.5 ${isLight ? "text-slate-900" : "text-white"}`}>
                 {selectedChar.codename}
               </div>
-              <div className="text-[10px] text-slate-400 truncate">
+              <div className="text-[10px] text-slate-500 truncate">
                 {selectedSkin.name} • {selectedChar.maxHealth} HP
               </div>
             </div>
@@ -557,13 +596,17 @@ const WelcomePage = () => {
               soundEngine.playClick();
               togglePerspective();
             }}
-            className="flex items-center justify-between w-52 sm:w-64 px-4 py-2.5 bg-[#0a0e17]/90 hover:bg-[#121927] border border-white/15 hover:border-cyan-400 text-left cursor-pointer clip-tactical-sm"
+            className={`flex items-center justify-between w-52 sm:w-64 px-4 py-2.5 border hover:border-cyan-400 text-left cursor-pointer clip-tactical-sm ${
+              isLight
+                ? "bg-white/95 text-slate-900 border-slate-300 shadow-sm hover:bg-slate-50"
+                : "bg-[#0a0e17]/90 text-white border-white/15 hover:bg-[#121927]"
+            }`}
           >
             <div className="flex items-center gap-2 text-xs font-black uppercase">
-              <Eye size={14} className="text-cyan-400" />
+              <Eye size={14} className="text-cyan-500" />
               <span>Camera Perspective</span>
             </div>
-            <span className="text-xs font-black font-mono text-amber-400">
+            <span className="text-xs font-black font-mono text-amber-500">
               {perspective.toUpperCase()}
             </span>
           </button>
@@ -581,27 +624,29 @@ const WelcomePage = () => {
             className={`flex items-center justify-between gap-4 px-4 py-3 sm:min-w-[320px] border text-left cursor-pointer transition-all clip-tactical-sm ${
               openDrawer === "mode_map"
                 ? "bg-amber-500/20 border-amber-400"
-                : "bg-[#0a0e17]/92 hover:bg-[#121927] border-white/15 hover:border-amber-400"
+                : isLight
+                  ? "bg-white/95 text-slate-900 border-slate-300 hover:border-amber-400 shadow-sm hover:bg-slate-50"
+                  : "bg-[#0a0e17]/92 text-white border-white/15 hover:border-amber-400 hover:bg-[#121927]"
             }`}
           >
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 bg-amber-500/15 border border-amber-500/40 flex items-center justify-center shrink-0">
-                <MapIcon size={18} className="text-amber-400" />
+                <MapIcon size={18} className="text-amber-500" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500">
                   {playMode.toUpperCase()} • {mode === "br" ? "BATTLE ROYALE" : mode.toUpperCase()}
                   {playMode === "solo" ? ` • ${botCount} BOTS` : ""}
                 </div>
-                <div className="text-base font-black uppercase tracking-wider truncate text-white">
+                <div className={`text-base font-black uppercase tracking-wider truncate ${isLight ? "text-slate-900" : "text-white"}`}>
                   {selectedMap.name}
                 </div>
-                <div className="text-[10px] text-slate-400 truncate">
+                <div className="text-[10px] text-slate-500 truncate">
                   Tap to change Mode, Map or Room
                 </div>
               </div>
             </div>
-            <ChevronRight size={18} className="text-amber-400 shrink-0" />
+            <ChevronRight size={18} className="text-amber-500 shrink-0" />
           </button>
 
           {/* Dominant Chamfered Amber DEPLOY Button */}
@@ -625,11 +670,17 @@ const WelcomePage = () => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-xl h-dvh bg-[#090d16] border-l border-amber-500/35 flex flex-col shadow-2xl"
+            className={`w-full max-w-xl h-dvh border-l flex flex-col shadow-2xl ${
+              isLight
+                ? "bg-slate-50 text-slate-900 border-slate-300"
+                : "bg-[#090d16] text-white border-amber-500/35"
+            }`}
           >
-            <div className="px-5 py-4 bg-[#0d121d] border-b border-white/10 flex items-center justify-between shrink-0">
+            <div className={`px-5 py-4 border-b flex items-center justify-between shrink-0 ${
+              isLight ? "bg-white border-slate-200" : "bg-[#0d121d] border-white/10"
+            }`}>
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-400">
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-500">
                   Tactical Mission Setup
                 </div>
                 <h2 className="text-lg font-black uppercase tracking-wider">
@@ -960,7 +1011,9 @@ const WelcomePage = () => {
               </div>
             </div>
 
-            <div className="p-4 bg-[#0d121d] border-t border-white/10 shrink-0">
+            <div className={`p-4 border-t shrink-0 ${
+              isLight ? "bg-white border-slate-200" : "bg-[#0d121d] border-white/10"
+            }`}>
               <button
                 type="button"
                 onClick={() => {
@@ -984,11 +1037,17 @@ const WelcomePage = () => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md h-dvh bg-[#090d16] border-l border-cyan-500/35 flex flex-col shadow-2xl"
+            className={`w-full max-w-md h-dvh border-l flex flex-col shadow-2xl ${
+              isLight
+                ? "bg-slate-50 text-slate-900 border-slate-300"
+                : "bg-[#090d16] text-white border-cyan-500/35"
+            }`}
           >
-            <div className="px-5 py-4 bg-[#0d121d] border-b border-white/10 flex items-center justify-between shrink-0">
+            <div className={`px-5 py-4 border-b flex items-center justify-between shrink-0 ${
+              isLight ? "bg-white border-slate-200" : "bg-[#0d121d] border-white/10"
+            }`}>
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-400">
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-500">
                   Special Forces Roster
                 </div>
                 <h2 className="text-lg font-black uppercase tracking-wider">
@@ -1085,7 +1144,9 @@ const WelcomePage = () => {
               </div>
             </div>
 
-            <div className="p-4 bg-[#0d121d] border-t border-white/10 shrink-0">
+            <div className={`p-4 border-t shrink-0 ${
+              isLight ? "bg-white border-slate-200" : "bg-[#0d121d] border-white/10"
+            }`}>
               <button
                 type="button"
                 onClick={() => {

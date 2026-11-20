@@ -220,57 +220,60 @@ async function fetchAndNormalizeDriveWeapon(weaponId: WeaponId): Promise<THREE.G
     return createProceduralWeaponTemplate(weaponId);
   }
 
-  const mtlLoader = new MTLLoader();
-  mtlLoader.setResourcePath("/models/drive/weapons/");
-  const materials = await mtlLoader.loadAsync(spec.mtl);
-  materials.preload();
+  try {
+    const mtlLoader = new MTLLoader();
+    mtlLoader.setResourcePath("/models/drive/weapons/");
+    const materials = await mtlLoader.loadAsync(spec.mtl);
+    materials.preload();
 
-  const objLoader = new OBJLoader();
-  objLoader.setMaterials(materials);
-  const rawObj = await objLoader.loadAsync(spec.obj);
+    const objLoader = new OBJLoader();
+    objLoader.setMaterials(materials);
+    const rawObj = await objLoader.loadAsync(spec.obj);
 
-  const rawBox = new THREE.Box3().setFromObject(rawObj);
-  const rawSize = new THREE.Vector3();
-  const rawCenter = new THREE.Vector3();
-  rawBox.getSize(rawSize);
-  rawBox.getCenter(rawCenter);
+    const rawBox = new THREE.Box3().setFromObject(rawObj);
+    const rawSize = new THREE.Vector3();
+    const rawCenter = new THREE.Vector3();
+    rawBox.getSize(rawSize);
+    rawBox.getCenter(rawCenter);
 
-  const rawLength = Math.max(rawSize.x, rawSize.y, rawSize.z, 0.001);
-  const scaleFactor = spec.targetLength / rawLength;
+    const rawLength = Math.max(rawSize.x, rawSize.y, rawSize.z, 0.001);
+    const scaleFactor = spec.targetLength / rawLength;
 
-  const gripPivotX = rawBox.min.x + rawSize.x * 0.34;
-  rawObj.position.set(-gripPivotX, -rawCenter.y, -rawCenter.z);
+    const gripPivotX = rawBox.min.x + rawSize.x * 0.34;
+    rawObj.position.set(-gripPivotX, -rawCenter.y, -rawCenter.z);
 
-  const normalizedRoot = new THREE.Group();
-  const barrelRotateWrapper = new THREE.Group();
-  barrelRotateWrapper.rotation.y = Math.PI / 2;
-  barrelRotateWrapper.scale.setScalar(scaleFactor);
-  barrelRotateWrapper.add(rawObj);
-  normalizedRoot.add(barrelRotateWrapper);
+    const normalizedRoot = new THREE.Group();
+    const barrelRotateWrapper = new THREE.Group();
+    barrelRotateWrapper.rotation.y = Math.PI / 2;
+    barrelRotateWrapper.scale.setScalar(scaleFactor);
+    barrelRotateWrapper.add(rawObj);
+    normalizedRoot.add(barrelRotateWrapper);
 
-  rawObj.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
-      if (Array.isArray(child.material)) {
-        child.material = child.material.map(upgradeMtlMaterial);
-      } else if (child.material) {
-        child.material = upgradeMtlMaterial(child.material);
+    rawObj.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (Array.isArray(child.material)) {
+          child.material = child.material.map(upgradeMtlMaterial);
+        } else if (child.material) {
+          child.material = upgradeMtlMaterial(child.material);
+        }
       }
-    }
-  });
+    });
 
-  weaponTemplateResolvedCache.set(weaponId, normalizedRoot);
-  return normalizedRoot;
+    weaponTemplateResolvedCache.set(weaponId, normalizedRoot);
+    return normalizedRoot;
+  } catch (err) {
+    console.warn("Drive weapon load failed, using procedural fallback:", weaponId, err);
+    return createProceduralWeaponTemplate(weaponId);
+  }
 }
 
 export function getCachedDriveWeaponSync(weaponId: WeaponId): THREE.Group | null {
   const cached = weaponTemplateResolvedCache.get(weaponId);
   if (cached) return cached;
-  if (!driveWeapons[weaponId]) {
-    return createProceduralWeaponTemplate(weaponId);
-  }
-  return null;
+  // Instantly return procedural template so viewmodel is NEVER blank or empty
+  return createProceduralWeaponTemplate(weaponId);
 }
 
 export function loadDriveWeaponTemplate(weaponId: WeaponId): Promise<THREE.Group> {

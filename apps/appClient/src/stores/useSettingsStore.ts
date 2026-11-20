@@ -184,7 +184,7 @@ function loadInitialSettings(): PersistedSettings {
       const parsed = JSON.parse(raw);
       return {
         keybindings: { ...DEFAULT_KEYBINDINGS, ...(parsed.keybindings || {}) },
-        perspective: parsed.perspective === "1p" ? "1p" : "3p",
+        perspective: parsed.perspective === "3p" ? "3p" : "1p",
         mouseSensitivity:
           typeof parsed.mouseSensitivity === "number" ? parsed.mouseSensitivity : 1.0,
         fov: typeof parsed.fov === "number" ? parsed.fov : 76,
@@ -195,14 +195,14 @@ function loadInitialSettings(): PersistedSettings {
             ? parsed.soundPack
             : "tactical",
         playerName: typeof parsed.playerName === "string" ? parsed.playerName : "",
-        theme: parsed.theme === "light" ? "light" : "dark",
+        theme: parsed.theme === "dark" ? "dark" : "light",
         skinId: typeof parsed.skinId === "string" ? parsed.skinId : "urban_ops",
         sprintMode: parsed.sprintMode === "toggle" ? "toggle" : "hold",
         adsMode: parsed.adsMode === "toggle" ? "toggle" : "hold",
         autoSprint: Boolean(parsed.autoSprint),
         autoReload: typeof parsed.autoReload === "boolean" ? parsed.autoReload : true,
         hideWeaponOnAds:
-          typeof parsed.hideWeaponOnAds === "boolean" ? parsed.hideWeaponOnAds : true,
+          typeof parsed.hideWeaponOnAds === "boolean" ? parsed.hideWeaponOnAds : false,
         cameraShoulder: parsed.cameraShoulder === "left" ? "left" : "right",
         cameraDistance:
           typeof parsed.cameraDistance === "number"
@@ -245,19 +245,19 @@ function loadInitialSettings(): PersistedSettings {
   }
   return {
     keybindings: { ...DEFAULT_KEYBINDINGS },
-    perspective: "3p",
+    perspective: "1p",
     mouseSensitivity: 1.0,
     fov: 76,
     masterVolume: 0.85,
     soundPack: "tactical",
     playerName: "",
-    theme: "dark",
+    theme: "light",
     skinId: "urban_ops",
     sprintMode: "hold",
     adsMode: "hold",
     autoSprint: false,
     autoReload: true,
-    hideWeaponOnAds: true,
+    hideWeaponOnAds: false,
     cameraShoulder: "right",
     cameraDistance: 3.7,
     crosshairStyle: "tactical",

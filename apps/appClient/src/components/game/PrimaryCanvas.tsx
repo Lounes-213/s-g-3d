@@ -35,7 +35,7 @@ const PrimaryScene = () => {
 
   return (
     <>
-      <PerspectiveCamera makeDefault fov={fov} near={0.08} far={420}>
+      <PerspectiveCamera makeDefault fov={fov} near={0.04} far={420}>
         <WeaponViewmodel />
       </PerspectiveCamera>
       <SkyBox />
